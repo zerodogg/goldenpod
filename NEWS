@@ -8,6 +8,7 @@ GoldenPod changelog
 - MAJOR cleanups
 - Added --clean
 - Added a Makefile
+- Added support for using LWP
 
 0.6
 - - - -
