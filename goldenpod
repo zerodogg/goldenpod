@@ -190,6 +190,7 @@ sub Version
 # Usage: Used in the GPLWP class
 sub LWPProgress
 {
+	return if not $Verbose;
 	my ($status, $response) = @_;
 	$| = 1;
 	if ($status eq 'tick')
@@ -280,8 +281,11 @@ sub fetchURL
 		{
 			$response = $UA->get($URL);
 		}
-		iprint('100% done');
-		print "\n";
+		if ($Verbose)
+		{
+			iprint('100% done');
+			print "\n";
+		}
 		if(not $response->is_success)
 		{
 			warn("Download of $URL failed: ".$response->status_line."\n");
