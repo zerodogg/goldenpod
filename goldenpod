@@ -76,7 +76,8 @@ sub PrintHelp {
 
 # Purpose: Output the program --help info.
 # Usage: Help();
-sub Help {
+sub Help
+{
 	$PodcastLog =~ s/$ENV{HOME}/~/;
 	Version();
 	printf("\nUsage: %s", basename($0));
@@ -113,7 +114,10 @@ sub Help {
 
 # Purpose: Print version and warranty information
 # Usage: Version();
-sub Version { print "GoldenPod $Version\n by Eskild Hustvedt\nGoldenPod comes with ABSOLUTELY NO WARRANTY!\n"; };
+sub Version
+{ 
+	print "GoldenPod $Version\n";
+}
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Helper functions
@@ -787,18 +791,20 @@ sub Arg_Verbose {
 # Purpose: Parse a feed
 # Usage: my($URLs,$Title) = ParseFeed(FEED_CONTENTS);
 #  $Title can be undef. $URLs is an arrayref, can be empty.
-sub ParseFeed {
+sub ParseFeed
+{
 	my $FeedContents = shift;
+	my $title;
 	my @URLs;
-	# Drop useless junk from the feed contents
+	# We don't care about newlines
 	$FeedContents =~ s/\r?\n?//g;
 	
 	# Try to find the title of the podcast
 	my $FeedTitle = $FeedContents;
-	if ($FeedTitle =~ /<title>([^<]*)<\/title>.*$/) {
-		$FeedTitle = $1;	#FIXME
+	if ($FeedTitle =~ s/^[^(<title>)]+<title>([^<]*)<\/title>.*$/$1/is)
+	{
 		# Run it through a filter
-		$FeedTitle =~ s/<.+?>//g;
+		$FeedTitle =~ s/<[^>]+>//g;
 		$FeedTitle =~ s/\s+/_/g;
 		$FeedTitle =~ s#(/|\#|\(|\)|\&|\%|\¤|\"|\|)#_#g;
 		$FeedTitle =~ s/[\-\_]+(episodes?|promo|mp3|ogg|feed)*$//gi; # Remove various junk
@@ -806,14 +812,16 @@ sub ParseFeed {
 		# Remove more than one - or _ in a row
 		$FeedTitle =~ s/-+/-/g;
 		$FeedTitle =~ s/_+/_/g;
-	} else {
+	}
+	else
+	{
 		$FeedTitle = "";
 	}
 	# Do the real parsing and add to @urls
 	# We want to extract all url='s
-	while(((my $CurrUrl = $FeedContents) =~ s/^.*url\s*=\s*[\"\']([^\"\']+)[\"\'].*$/$1/))
+	while(((my $CurrUrl = $FeedContents) =~ s/^.*url\s*=\s*[\"\']([^\"\']+)[\"\'].*$/$1/i))
 	{
-		$FeedContents =~ s/url\s*=\s*[\"\'](\Q$CurrUrl\E)[\"\']//;
+		$FeedContents =~ s/url\s*=\s*[\"\'](\Q$CurrUrl\E)[\"\']//i;
 		# Filter away non-audio feeds if the user wants it.
 		if ($Config{PodcastFilter}) {
 			next unless basename($CurrUrl) =~ /.*\.(ogg|mp3|m4a|wave?|flac|wmv|ape|tta|aac|mp2|mpa|ra|ram|aif|au|mpu).*/i;
