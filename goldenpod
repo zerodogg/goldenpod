@@ -64,6 +64,12 @@ $mon++; $mon = PrefixZero($mon);		# Make the month be 1-12 instead of 0-11 and a
 $mday = PrefixZero($mday);			# Append a zero to the mday too
 my $date = "$year-$mon-$mday"; 			# The date in the international date format
 
+my $downloader = 'LWP';
+
+my $lastP = (0,0);
+my $prevLen = 0;
+my $LWP_InitialOut = 0;
+
 # This makes sure children are slayed properly and their return values
 # are kept (in the %ReturnVals hash)
 $SIG{CHLD} = sub
@@ -177,8 +183,196 @@ sub Version
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Download helpers
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: LWP progression printer
+# Usage: Used in the GPLWP class
+sub LWPProgress
+{
+	my ($status, $response) = @_;
+	$| = 1;
+	if ($status eq 'tick')
+	{
+		progressed();
+	}
+	elsif ($status eq 'begin')
+	{
+		if(not $LWP_InitialOut)
+		{
+			print "Downloading... ";
+			$LWP_InitialOut = 1;
+		}
+		else
+		{
+			progressed();
+		}
+	}
+	elsif ($status eq 'end')
+	{
+		return;
+	}
+	else
+	{
+		$status = int($status * 100);
+		iprint(sprintf('%-4s',$status.'%'));
+	}
+}
+
+# Purpose: Initialize the downloader
+# Usage. initDownload();
+sub initDownload
+{
+	my %Has = (
+		LWP => 0,
+		curl => 0,
+	);
+	if(InPath('curl'))
+	{
+		$Has{curl} = 1;
+		if ($downloader eq 'curl')
+		{
+			return;
+		}
+	}
+	if(eval('use LWP::UserAgent; 1;'))
+	{
+		$Has{LWP} = 1;
+		eval("package GPLWP; our \@ISA = qw(LWP::UserAgent); sub progress { shift; return main::LWPProgress(\@_)};");
+		return;
+	}
+	
+	if(not $Has{LWP} and not $Has{curl})
+	{
+		die("Both LWP and curl are missing\n");
+	}
+
+	if ($Has{curl})
+	{
+		$downloader = 'curl';
+		return;
+	}
+	die("No downloader found\n");
+}
+
+# Purpose: Fetch a URL, either returning the data or writing a file
+# Usage: fetchURL( SOME_URL, FileName?);
+# Will download to FileName if present, if undef then it will return
+# the content;
+sub fetchURL
+{
+	my $URL = shift;
+	my $targetFile = shift;
+
+	if ($downloader eq 'LWP')
+	{
+		$lastP = (0,0);
+		$prevLen = 0;
+		$LWP_InitialOut = 0;
+		# GPLWP is a GoldenPod wrapper around LWP
+		my $UA = GPLWP->new();
+		my $response;
+		if ($targetFile)
+		{
+			$response = $UA->mirror($URL,$targetFile);
+		}
+		else
+		{
+			$response = $UA->get($URL);
+		}
+		iprint('100% done');
+		print "\n";
+		if(not $response->is_success)
+		{
+			warn("Download of $URL failed: ".$response->status_line."\n");
+			return;
+		}
+		return $response->content;
+	}
+	elsif ($downloader eq 'curl')
+	{
+		my ($Child_IN, $Child_OUT, $Output);
+		my @LocalArgs;
+		if ($targetFile)
+		{
+			push(@LocalArgs,'-O');
+		}
+		my $PID = open2($Child_OUT, $Child_IN, 'curl',@CurlGlobal,@CurlVerbosity,@LocalArgs,$URL) or die("Unable to open3() connection to curl: $!\n");
+		# Read from curl
+		while(<$Child_OUT>)
+		{
+			if (not $targetFile)
+			{
+				$Output .= $_;
+			}
+		}
+		return $Output;
+	}
+	else
+	{
+		die("Unknown downloader: $downloader\n");
+	}
+}
+
+# Purpose: Download a URL
+# Usage: DownloadURL(ToDir, URL);
+#  Also handles creating the ToDir
+sub DownloadURL
+{
+	my ($ToDir, $URL) = @_;
+	my $CWD = getcwd();
+	if(not -d $ToDir)
+	{
+		mkdir($ToDir) or die("Unable to mkdir $ToDir: $!\n");
+	}
+	chdir($ToDir);
+
+	my $fileName = basename($URL);
+	fetchURL($URL,$fileName);
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Helper functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: A print that removes previous text before printing. Used for status Information messages.
+# Usage: iprint(text);
+sub iprint
+{
+	local $| = false;
+    my $data = shift;
+    if ($prevLen)
+    {
+        for(my $i = 0; $i < $prevLen; $i++)
+        {
+            print "\b \b";
+        }
+    }
+    $prevLen = length($data);
+    print $data;
+	local $| = true;
+}
+
+# Purpose: Output pretty progression indicator
+# Usage: progressed();
+#		- Outputs something every ten times it is called
+sub progressed
+{
+	$lastP++;
+	my $v;
+	if(not defined($lastP) or $lastP == 1 or $lastP == 5){
+		$v = '-';
+	}elsif($lastP == 2 or $lastP == 6) {
+		$v = '\\';
+	}elsif($lastP == 3 or $lastP == 7) {
+		$v = '|';
+	}elsif($lastP == 4 or $lastP == 8) {
+		$v = '/';
+	}
+	$lastP = 0 if ($lastP == 8);
+	iprint($v);
+	return true;
+}
 
 # Purpose: print() something if we're verbose
 # Usage: printv(OPTS);
@@ -246,24 +440,6 @@ sub Clear
 		print "\n" foreach(1..120);
 		print "\b\r" foreach(1..120);
 	}
-}
-
-# Purpose: Download a URL
-# Usage: DownloadURL(ToDir, URL);
-#  Also handles creating the ToDir
-sub DownloadURL
-{
-	my ($ToDir, $URL) = @_;
-	my $CWD = getcwd();
-	if(not -d $ToDir)
-	{
-		mkdir($ToDir) or die("Unable to mkdir $ToDir: $!\n");
-	}
-	chdir($ToDir);
-	my $DownloadStatus = system('curl', @CurlGlobal, @CurlVerbosity, '-O', $URL);
-	chdir($CWD);
-	$DownloadStatus = $DownloadStatus >> 8;
-	return($DownloadStatus);
 }
 
 # Purpose: Prefix a "0" to a number if it is only one digit.
@@ -607,7 +783,7 @@ sub DeleteOldPodcasts
 	@FileList = reverse SortedFileList("$CatalogueDirectory/All");
 	my $PodcastCount = @FileList;
 	# We don't allow the user to delete the last remaining podcast.
-	die("Only one podcast has been downloaded. If you really want to delete it you must do so manually\n") if $PodcastCount == 1;
+	die("Only one podcast has been downloaded. If you really want to delete it you must do so manually.\n") if $PodcastCount == 1;
 	# Make sure we don't delete more than the total amount of podcasts minus one
 	if ($NumberOfFiles >= $PodcastCount)
 	{
@@ -616,7 +792,7 @@ sub DeleteOldPodcasts
 		{
 			$NumberOfFiles--;
 		}
-		warn "$ErrorNo is higher than the total amount of podcasts ($PodcastCount). Using $NumberOfFiles instead\n";
+		die "$ErrorNo is higher than the total amount of podcasts ($PodcastCount).\nIf you really want to clean up anyway, use --files to specify how many should be deleted\n";
 	}
 	# Delete the files
 	my $DeletedFiles = 0;
@@ -984,10 +1160,21 @@ sub ParseFeed
 	$FeedContents =~ s/\r?\n?//g;
 	
 	# Try to find the title of the podcast
-	my $FeedTitle = $FeedContents;
-	if ($FeedTitle =~ s/^[^(<title>)]+<title>([^<]*)<\/title>.*$/$1/is)
+	my $FeedTitle;
+	my $ParseTitle = $FeedContents;
+	chomp($ParseTitle);
+	foreach my $t (split(/</i,$ParseTitle))
 	{
-		# Run it through a filter
+		next if not $t =~ s/title[^>]*>//;
+		$FeedTitle = $t;
+		if(length($FeedTitle) > 400)
+		{
+			my $orig = $FeedTitle;
+			$FeedTitle = substr($FeedTitle,0,20);
+			warn("WARNING: Unreasonably long feed title ($orig). Using $FeedTitle instead\n");
+		}
+		# Remove stuff in parens, as that often contains stuff like "mp3 feed"
+		$FeedTitle =~ s/\([^\)]*\)//;
 		$FeedTitle =~ s/<[^>]+>//g;
 		$FeedTitle =~ s/\s+/_/g;
 		$FeedTitle =~ s#(/|\#|\(|\)|\&|\%|\¤|\"|\|)#_#g;
@@ -996,8 +1183,9 @@ sub ParseFeed
 		# Remove more than one - or _ in a row
 		$FeedTitle =~ s/-+/-/g;
 		$FeedTitle =~ s/_+/_/g;
+		last;
 	}
-	else
+	if (not $FeedTitle)
 	{
 		$FeedTitle = "";
 	}
@@ -1150,12 +1338,8 @@ sub FetchFeeds
 		printv("Fetching $podcast\n");
 		$ConfIsNotEmpty = 1;	# The config isn't empty! Yay!
 		# Open curl for reading
-		my ($Child_IN, $Child_OUT, $Output);
-		my $PID = open2($Child_OUT, $Child_IN, "curl",@CurlGlobal,@CurlVerbosity,$podcast) or die("Unable to open3(): $!\n");
-		# Read from curl
-		while(<$Child_OUT>) {
-			$Output .= $_;
-		}
+		my $Output = fetchURL($podcast);
+		next if not $Output;
 		# Parse the feed and get the URLs
 		my ($URLs, $Title) = ParseFeed($Output);
 		# If URLs is empty just jump to the next feed
@@ -1227,6 +1411,8 @@ sub main
 {
 	# First prepare logging.
 	PrepareLogging();
+	# Initialize our downloader
+	initDownload();
 	# Then fetch and parse our feeds.
 	my $DownloadQueue = FetchFeeds();
 	if(scalar(@{$DownloadQueue}) == 0) {
@@ -1267,7 +1453,8 @@ GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 	'files|n=s' => \$FileNumber,
 	'delete|d' => \$CopyFiles_Delete,
 	'rmold|o' => \$RemoveOldFiles,
-	'silent|s' => sub { 
+	'silent|s' => sub
+	{ 
 		$Verbose = 0;
 		$NoLog = 0 unless $NoLog == 2;
 		@CurlVerbosity = qw(--silent --show-error);
@@ -1324,8 +1511,6 @@ unless ($IgnorePattern) {
 
 # If we're copying then run the CopyFiles() subroutine
 CopyFiles if $CopyFilesTo;
-# Make sure we have curl
-die "GoldenPod requires curl to work, you don't seem to have curl installed!\nPlease install curl, then re-run GoldenPod\n" unless (InPath "curl");
 
 die "The configuration file \"$Config\" does not exist!\nPlease read the manpage included to get instructions on how to set one up.\n" unless -e $Config;
 
