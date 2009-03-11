@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # GoldenPod version 0.7
-# Copyright (C) Eskild Hustvedt 2005, 2006, 2007
+# Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ my (
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config);
 
 # Version number
-my $Version = "0.7";			# My version
+my $Version = '0.7';			# My version
 # Default is that curl is silent but displays errors (logged, not to STDOUT)
 my @CurlVerbosity = ("--silent","--show-error");
 # Curl options:
@@ -55,7 +55,7 @@ my @CurlVerbosity = ("--silent","--show-error");
 # -k for insecure (allow ssl servers with odd certificates)
 # -L to follow location hints
 # -A sets the user agent string
-my @CurlGlobal = ( "-C","-k","-L","-A","GoldenPod $Version - http://goldenpod.nongnu.org/");
+my @CurlGlobal = ( qw(-C -k -L -A),"GoldenPod $Version - http://goldenpod.nongnu.org/");
 
 # Get the current date
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
@@ -69,9 +69,60 @@ my $date = "$year-$mon-$mday"; 			# The date in the international date format
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 # Purpose: Print formatted --help output
-# Usage: PrintHelp("-shortoption", "--longoption", "description");
+# Usage: PrintHelp('-shortoption', '--longoption', 'description');
+#  Description will be reformatted to fit within a normal terminal
 sub PrintHelp {
-	printf "%-4s %-16s %s\n", "$_[0]", "$_[1]", "$_[2]";
+	# The short option
+	my $short = shift,
+	# The long option
+	my $long = shift;
+	# The description
+	my $desc = shift;
+	# The generated description that will be printed in the end
+	my $GeneratedDesc;
+	# The current line of the description
+	my $currdesc = '';
+	# The maximum length any line can be
+	my $maxlen = 80;
+	# The length the options take up
+	my $optionlen = 20;
+	# Check if the short/long are LONGER than optionlen, if so, we need
+	# to do some additional magic to take up only $maxlen.
+	# The +1 here is because we always add a space between them, no matter what
+	if ((length($short) + length($long) + 1) > $optionlen)
+	{
+		$optionlen = length($short) + length($long) + 1;
+	}
+	# Split the description into lines
+	foreach my $part (split(/ /,$desc))
+	{
+		if(defined $GeneratedDesc)
+		{
+			if ((length($currdesc) + length($part) + 1 + 20) > $maxlen)
+			{
+				$GeneratedDesc .= "\n";
+				$currdesc = '';
+			}
+			else
+			{
+				$currdesc .= ' ';
+				$GeneratedDesc .= ' ';
+			}
+		}
+		$currdesc .= $part;
+		$GeneratedDesc .= $part;
+	}
+	# Something went wrong
+	die("Option mismatch") if not $GeneratedDesc;
+	# Print it all
+	foreach my $description (split(/\n/,$GeneratedDesc))
+	{
+		printf "%-4s %-15s %s\n", $short,$long,$description;
+		# Set short and long to '' to ensure we don't print the options twice
+		$short = '';$long = '';
+	}
+	# Succeed
+	return true;
 }
 
 # Purpose: Output the program --help info.
@@ -82,34 +133,31 @@ sub Help
 	Version();
 	printf("\nUsage: %s", basename($0));
 	printf("\n  or : %s [OPTIONS]\n\n", basename($0));
-	PrintHelp("", "--version", "Display version information and exit");
-	PrintHelp("-h", "--help", "This help screen");
+	PrintHelp('', '--version', 'Display version information and exit');
+	PrintHelp('-h', '--help', 'This help screen');
 	# Inform the user about the default based upon the value of $Config{DefaultVerbosity}
-	if ($Config{DefaultVerbosity}) {
-		PrintHelp("-v", "--verbose", "Be verbose (default)");
-		PrintHelp("-s", "--silent", "Be silent");
-	} else {
-		PrintHelp("-v", "--verbose", "Be verbose");
-		PrintHelp("-s", "--silent", "Be silent (default)");
+	if ($Config{DefaultVerbosity})
+	{
+		PrintHelp('-v', '--verbose', 'Be verbose (default)');
+		PrintHelp('-s', '--silent', 'Be silent');
 	}
-	PrintHelp("", "--dumpinfo", "Print the files goldenpod would work with");
-	PrintHelp("", "--stats", "Print some simple statistics");
-	PrintHelp("-l", "--nolog", "Don't create a message logfile when in non-verbose mode.");
-	PrintHelp("-u", "--dry-run", "Display what would be done but don't do it. Implies --verbose");
-	PrintHelp("-w", "--no-download", "Act as if all pending podcasts are downloaded");
-	PrintHelp("", "", "but don't actually download anything. Implies --verbose");
-	PrintHelp("-f", "--first-only", "Only download the first file in any feed.");
-	PrintHelp("", "", "Permanently ignore the others.");
-	PrintHelp("-c", "--copy [path]", "Copy the last N downloaded files to path.");
-	PrintHelp("", "", "N is either 4 or the number supplied to --files.");
-	PrintHelp("-n", "--files N", "Copy N files instead of 4 (use with --copy or --rmold)");
-	PrintHelp("-d", "--delete", "Delete all other files in the target --copy");
-	PrintHelp("", "", "directory");
-	PrintHelp("-o", "--rmold", "Delete N old podcasts where N is 4 or the number");
-	PrintHelp("", "", "supplied to --files");
-	PrintHelp("-i", "--ignore-pattern", "Ignore filenames matching the regexp pattern");
-	PrintHelp("", "", "supplied when downloading, copying or deleting podcasts");
-	PrintHelp("","--clean","Clean up the podcasts directory and catalogue.");
+	else
+	{
+		PrintHelp('-v', '--verbose', 'Be verbose');
+		PrintHelp('-s', '--silent', 'Be silent (default)');
+	}
+	PrintHelp('', '--dumpinfo', 'Print the files goldenpod would work with');
+	PrintHelp('', '--stats', 'Print some simple statistics');
+	PrintHelp('-l', '--nolog', 'Don\'t create a message logfile when in non-verbose mode.');
+	PrintHelp('-u', '--dry-run', 'Display what would be done but don\'t do it. Implies --verbose');
+	PrintHelp('-w', '--no-download', 'Act as if all pending podcasts are downloaded but don\'t actually download anything. Implies --verbose.');
+	PrintHelp('-f', '--first-only', 'Only download the first file in any feed. Permanently ignore the others.');
+	PrintHelp('-c', '--copy [path]', 'Copy the last N downloaded files to path. N is either 4 or the number supplied to --files.');
+	PrintHelp('-n', '--files N', 'Copy N files instead of 4 (use with --copy or --rmold)');
+	PrintHelp('-d', '--delete', 'Delete all other files in the target --copy directory');
+	PrintHelp('-o', '--rmold', 'Delete N old podcasts where N is 4 or the number supplied to --files');
+	PrintHelp('-i', '--ignore-pattern', 'Ignore filenames matching the regexp pattern supplied when downloading, copying or deleting podcasts.');
+	PrintHelp('','--clean','Clean up the podcasts directory and catalogue.');
 }
 
 # Purpose: Print version and warranty information
@@ -149,7 +197,7 @@ sub PrepareLogging {
 # Purpose: Check for a file in path
 # Usage: InPath(FILE)
 sub InPath {
-	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and ! -d "$_/@_" ) {	return true; } } return false;
+	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and ! -d "$_/@_" ) {	return "$_/@_"; } } return false;
 }
 
 # Purpose: Check if a directory is empty
@@ -203,26 +251,42 @@ sub PrependZero {
 # Purpose: Get OS/distro version information
 # Usage: print "OS: ",GetDistVer(),"\n";
 sub GetDistVer {
+	# Try LSB first
+	my %LSB;
+	if (-e '/etc/lsb-release')
+	{
+		LoadConfigFile('/etc/lsb-release',\%LSB);
+		if(defined($LSB{DISTRIB_ID}) and $LSB{DISTRIB_ID} =~ /\S/ and defined($LSB{DISTRIB_RELEASE}) and $LSB{DISTRIB_RELEASE} =~ /\S/)
+		{
+			my $ret = '/etc/lsb-release: '.$LSB{DISTRIB_ID}.' '.$LSB{DISTRIB_RELEASE};
+			if(defined($LSB{DISTRIB_CODENAME}))
+			{
+				$ret .= ' ('.$LSB{DISTRIB_CODENAME}.')';
+			}
+			return($ret);
+		}
+	}
 	# GNU/Linux and BSD
-	foreach(qw/mandriva mandrakelinux mandrake fedora redhat red-hat ubuntu lsb debian gentoo suse distro dist slackware freebsd openbsd netbsd dragonflybsd NULL/) {
+	foreach(qw/mandriva mandrakelinux mandrake fedora redhat red-hat ubuntu debian gentoo suse distro dist slackware freebsd openbsd netbsd dragonflybsd NULL/)
+	{
 		if (-e "/etc/$_-release" or -e "/etc/$_-version" or -e "/etc/${_}_version" or $_ eq "NULL") {
 			my ($DistVer, $File, $VERSION_FILE);
 			if(-e "/etc/$_-release") {
 				$File = "$_-release";
-				open($VERSION_FILE, "<", "/etc/$_-release");
+				open($VERSION_FILE, '<', "/etc/$_-release");
 				$DistVer = <$VERSION_FILE>;
 			} elsif (-e "/etc/$_-version") {
 				$File = "$_-version";
-				open($VERSION_FILE, "<", "/etc/$_-release");
+				open($VERSION_FILE, '<', "/etc/$_-release");
 				$DistVer = <$VERSION_FILE>;
 			} elsif (-e "/etc/${_}_version") {
 				$File = "${_}_version";
-				open($VERSION_FILE, "<", "/etc/${_}_version");
+				open($VERSION_FILE, '<', "/etc/${_}_version");
 				$DistVer = <$VERSION_FILE>;
-			} elsif ($_ eq "NULL") {
-				last unless -e "/etc/version";
+			} elsif ($_ eq 'NULL') {
+				last unless -e '/etc/version';
 				$File = 'version';
-				open($VERSION_FILE, "<", "/etc/version");
+				open($VERSION_FILE, '<', '/etc/version');
 				$DistVer = <$VERSION_FILE>;
 			}
 			close($VERSION_FILE);
@@ -236,38 +300,83 @@ sub GetDistVer {
 		my $DarwinName;
 		my $DarwinOSVer;
 		# Darwin kernel, try to get OS X info.
-		if(InPath("sw_vers")) {
-			if(open(my $SW_VERS, "sw_vers |")) {
-				while(<$SW_VERS>) {
-					chomp;
-					if (s/^ProductName:\s+//gi) {
-						$DarwinName = $_;
-					} elsif(s/^ProductVersion:\s+//) {
-						$DarwinOSVer = $_;
+		if(InPath('sw_vers')) {
+			if(eval('use IPC::Open2;1')) {
+				if(open2(my $SW_VERS, my $NULL_IN, 'sw_vers')) {
+					while(<$SW_VERS>) {
+						chomp;
+						if (s/^ProductName:\s+//gi) {
+							$DarwinName = $_;
+						} elsif(s/^ProductVersion:\s+//) {
+							$DarwinOSVer = $_;
+						}
 					}
+					close($SW_VERS);
 				}
-				close($SW_VERS);
 			}
 		}
 		if(defined($DarwinOSVer) and defined($DarwinName)) {
 			return("$DarwinName $DarwinOSVer ($machine)");
 		}
 	}
-	return("Unknown ($sysname $release $version $machine)");
+	# Detect additional release/version files
+	my $RelFile;
+	foreach(glob('/etc/*'))
+	{
+		next if not /(release|version)/i;
+		next if m/\/(subversion|lsb-release)$/;
+		if ($RelFile)
+		{
+			$RelFile .= ', '.$_;
+		}
+		else
+		{
+			$RelFile = ' ('.$_;
+		}
+	}
+	if ($RelFile)
+	{
+		$RelFile .= ')';
+	}
+	else
+	{
+		$RelFile = '';
+	}
+	# Some distros set a LSB DISTRIB_ID but no version, try DISTRIB_ID
+	# along with the kernel info.
+	if ($LSB{DISTRIB_ID})
+	{
+		return($LSB{DISTRIB_ID}."/Unknown$RelFile ($sysname $release $version $machine)");
+	}
+	return("Unknown$RelFile ($sysname $release $version $machine)");
 }
 
 # Purpose: Display useful information
 # Usage: DumpInfo();
 sub DumpInfo {
 	Version();
-	print "\nI would read the configuration file $UserConfigDir/goldenpod.conf\n";
-	print "I would read podcasts from $Config\n";
-	print "I would log the program messages to $ProgramLog\n" unless $Verbose or $NoLog;
-	print "I would log the downloaded podcasts to $PodcastLog\n";
-	print "I would write to $Config{WorkingDir}\n";
+	print "\n";
+	my $pattern = "%-28s: %s\n";
+	printf($pattern, 'Configuration file',$UserConfigDir.'/goldenpod.conf');
+	printf($pattern, 'Podcast list',$Config);
+	printf($pattern, 'Logfile',$ProgramLog) if ($Verbose and not $NoLog);
+	printf($pattern, 'List of downloaded podcasts',$PodcastLog);
+	printf($pattern, 'Target download directory',$Config{WorkingDir});
 	if($_[0]) {
-		printf "Perl version %vd\n", $^V;
-		print "OS: ", GetDistVer(), "\n";
+		printf($pattern, 'Perl version', sprintf('%vd',$^V));
+		printf($pattern, 'OS',GetDistVer());
+		eval('use Digest::MD5;');
+		my $md5 = Digest::MD5->new();
+		my $self = $0;
+		if(not -f $self)
+		{
+			$self = InPath($self);
+		}
+		open(my $f,'<',$self);
+		$md5->addfile($f);
+		my $digest = $md5->hexdigest;
+		close($f);
+		printf($pattern,'MD5',$digest);
 	}
 }
 
@@ -566,7 +675,7 @@ sub WriteConfigFile {
 	my ($File, $Config, $Explanations) = @_;
 
 	# Open the config for writing
-	open(my $CONFIG, ">", "$File") or do {
+	open(my $CONFIG, '>', "$File") or do {
 		# If we can't then we error out, no need for failsafe stuff - it's just the config file
 		warn("Unable to save the configuration file $File: $!");
 		return(0);
@@ -575,10 +684,9 @@ sub WriteConfigFile {
 		print $CONFIG "# $Explanations->{HEADER}\n";
 	}
 	foreach(sort(keys(%{$Config}))) {
+		next unless length($Config->{$_});	# Don't write empty options
 		if(defined($Explanations->{$_})) {
 			print $CONFIG "\n# $Explanations->{$_}";
-		} else {
-			next unless length($Config->{$_}) # Don't write empty options not in %Explanations
 		}
 		print $CONFIG "\n$_=$Config->{$_}\n";
 	}
@@ -594,8 +702,8 @@ sub WriteConfigFile {
 sub LoadConfigFile {
 	my ($File, $ConfigHash, $OptionRegex, $OnlyValidOptions) = @_;
 
-	open(my $CONFIG, "<", "$File") or do {
-		printf("Unable to read the configuration settings from %s: %s", $File, $!);
+	open(my $CONFIG, '<', "$File") or do {
+		warn(sprintf("Unable to read the configuration settings from %s: %s", $File, $!));
 		return(0);
 	};
 	while(<$CONFIG>) {
@@ -604,21 +712,21 @@ sub LoadConfigFile {
 		chomp;
 		my $Option = $_;
 		my $Value = $_;
-		$Option =~ s/^\s*(.*)\s*=.*/$1/;
-		$Value =~ s/^.*=\s*(.*)\s*/$1/;
+		$Option =~ s/^\s*(\w+)\s*=.*/$1/;
+		$Value =~ s/^\s*\w+\s*=\s*(.*)\s*/$1/;
 		if($OnlyValidOptions) {
 			unless(defined($OptionRegex->{$Option})) {
-				warn("Unknown configuration option \"$Option\" in $File: Ignored.\n");
+				warn("Unknown configuration option \"$Option\" (=$Value) in $File: Ignored.");
 				next;
 			}
 		}
 		unless(defined($Value)) {
-			warn("Empty value for option $Option in $File\n");
+			warn("Empty value for option $Option in $File");
 		}
 		if(defined($OptionRegex) and defined($OptionRegex->{$Option})) {
 			my $MustMatch = $OptionRegex->{$Option};
 			unless ($Value =~ /$MustMatch/) {
-				print "Invalid setting of $Option in the config file: Must match $OptionRegex->{Option}.\n";
+				warn("Invalid setting of $Option (=$Value) in the config file: Must match $OptionRegex->{Option}.");
 				next;
 			}
 		}
@@ -1034,9 +1142,9 @@ sub FetchFeeds {
 	return(\@DownloadQueue);
 }
 
-# Purpose: Perform the main functions
-# Usage: PerformMain();
-sub PerformMain {
+# Purpose: The main function
+# Usage: main();
+sub main {
 	# First prepare logging.
 	PrepareLogging();
 	# Then fetch and parse our feeds.
@@ -1082,7 +1190,7 @@ GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 	'silent|s' => sub { 
 		$Verbose = 0;
 		$NoLog = 0 unless $NoLog == 2;
-		@CurlVerbosity = ("--silent", "--show-error");
+		@CurlVerbosity = qw(--silent --show-error);
 	},
 	'ignore-pattern|ignorepattern|i=s' => sub {
 		$IgnorePattern = $_[1];
@@ -1141,7 +1249,7 @@ die "GoldenPod requires curl to work, you don't seem to have curl installed!\nPl
 
 die "The configuration file \"$Config\" does not exist!\nPlease read the manpage included to get instructions on how to set one up.\n" unless -e $Config;
 
-PerformMain();
+main();
 __END__
 =encoding utf8
 
@@ -1155,29 +1263,29 @@ B<goldenpod> [I<OPTIONS>]
 
 =head1 DESCRIPTION
 
-B<GoldenPod> is a podcast client (or podcast aggregator, or podcatcher, feel free
-to pick whichever name you want) written in perl.
+B<GoldenPod> is a podcast client (or podcast aggregator, or podcatcher, feel
+free to pick whichever name you want) written in perl.
 
 It supports reading configuration files in ~/.goldenpod/ and then saving the
-podcasts to the directory defined there (by default ~/Podcasts/). It also supports
-just getting thrown into a directory where BashPodder used to be and replacing
-it automagically, or having its config files in the same directory as itself
-and then just being run from a random location and detecting and performing a chdir correctly.
-This, along with being able to run in silent mode by simply adding -s
-or changing the corresponding option in the configuration file makes
-GoldenPod both cron-friendly and user-friendly.
+podcasts to the directory defined there (by default ~/Podcasts/). It also
+supports just getting thrown into a directory where BashPodder used to be and
+replacing it automagically, or having its config files in the same directory as
+itself and then just being run from a random location and detecting and
+performing a chdir correctly.  This, along with being able to run in silent
+mode by simply adding -s or changing the corresponding option in the
+configuration file makes GoldenPod both cron-friendly and user-friendly.
 
 =head1 ADDING PODCAST FEEDS TO GOLDENPOD
 
-GoldenPod has two different configuration files. One is I<goldenpod.conf>
-the other is the podcasts configuration file. The goldenpod.conf file
-should hopefully explain itself.
+GoldenPod has two different configuration files. One is I<goldenpod.conf> the
+other is the podcasts configuration file. The goldenpod.conf file should
+hopefully explain itself.
 
-The syntax of the podcasts configuration file is simple; for each podcast
-you want B<goldenpod> to download you add the URL to the RSS feed on a line
-by its own to the podcasts configuration file. That is either one of
-I<~/.goldenpod/podcasts.conf>, I<./podcasts.conf> or I<./bp.conf>.
-GoldenPod will first check for ./podcasts.conf, then ./bp.conf and lastly
+The syntax of the podcasts configuration file is simple; for each podcast you
+want B<goldenpod> to download you add the URL to the RSS feed on a line by its
+own to the podcasts configuration file. That is either one of
+I<~/.goldenpod/podcasts.conf>, I<./podcasts.conf> or I<./bp.conf>.  GoldenPod
+will first check for ./podcasts.conf, then ./bp.conf and lastly
 ~/.goldenpod/podcasts.conf - it will never read more than one podcasts
 configuration file.
 
@@ -1226,50 +1334,52 @@ Be silent.
 
 =item B<-l, --nolog>
 
-Don't create a message logfile when in non-verbose mode.
-Has no use with B<--verbose>
+Don't create a message logfile when in non-verbose mode.  Has no use with
+B<--verbose>
 
 =item B<--dumpinfo>
 
-Print the configuration and podcast list filenames that GoldenPod would read, in addition
-to the logfiles it would use and write to.
+Print the configuration and podcast list filenames that GoldenPod would read,
+in addition to the logfiles it would use and write to.
 
 =item B<--stats>
 
-Print some simple statistics: How many files you currently have in your catalogue, which file
-is the latest, which file is the oldest and how much space they are using.
+Print some simple statistics: How many files you currently have in your
+catalogue, which file is the latest, which file is the oldest and how much
+space they are using.
 
 =item B<-u, --dry-run>
 
-Used along with --copy or --rmold. Just display what would be done,
-don't actually copy or delete anything.
-Implies B<--verbose>
+Used along with --copy or --rmold. Just display what would be done, don't
+actually copy or delete anything.  Implies B<--verbose>
 
 =item B<-w, --no-download>
 
-Only write the logfile, don't download anything. Useful when you want to subscribe to a podcast but not
-download all of the old issues. You can edit the logfile afterwards and remove those you want to download.
-Implies B<--verbose>.
+Only write the logfile, don't download anything. Useful when you want to
+subscribe to a podcast but not download all of the old issues. You can edit the
+logfile afterwards and remove those you want to download.  Implies
+B<--verbose>.
 
 =item B<-f, --first-only>
 
-Only download the first file in any feed, permanently ignore the others.
-So running --first-only will fetch the first file in the feed, and then
-permanently ignore any older ones - but will (unless you use --first-only) download
-all later files. If you want to download any older you will need to edit the logfile.
-Unlike --no-download this does not imply --verbose
+Only download the first file in any feed, permanently ignore the others.  So
+running --first-only will fetch the first file in the feed, and then
+permanently ignore any older ones - but will (unless you use --first-only)
+download all later files. If you want to download any older you will need to
+edit the logfile.  Unlike --no-download this does not imply --verbose
 
 =item B<-c, --copy I</path>>
 
-Copy the last N downloaded files to /path/ and delete the other files in /path/.
-This is very useful for synchronizing the latest podcasts with your MP3 player.
-N is either 4 by default or optionally the value supplied to --files.
+Copy the last N downloaded files to /path/ and delete the other files in
+/path/.  This is very useful for synchronizing the latest podcasts with your
+MP3 player.  N is either 4 by default or optionally the value supplied to
+--files.
 
 =item B<-d, --delete>
 
 For use with --copy, delete all files in /path/ unless they are one of the
-files we are about to copy. It will not allow you to delete files directly in your
-home directory (but all subdirectories except Documents) nor any files in
+files we are about to copy. It will not allow you to delete files directly in
+your home directory (but all subdirectories except Documents) nor any files in
 /usr /var /dev /etc /lib /sbin /sys /boot or /proc.
 
 =item B<-n, --files I<N>>
@@ -1279,28 +1389,28 @@ For use with --copy or --rmold. Copy/delete N files instead of 4.
 =item B<-o, --rmold>
 
 Delete N old podcasts, where N is either 4 or optionally the value supplied to
---files. Use this to free up some disk space taken up by old podcasts.
-This will obey --ignore-pattern but not the $IgnorePattern configuration
-option. It will always leave at least the latest podcast.
+--files. Use this to free up some disk space taken up by old podcasts.  This
+will obey --ignore-pattern but not the $IgnorePattern configuration option. It
+will always leave at least the latest podcast.
 
 =item B<-i, --ignore-pattern>
 
 Ignore files matching the regular expression pattern supplied when downloading
 or copying podcasts.
 
-For example: "--ignore-pattern foo" would ignore any
-podcast containing the word "foo" in its filename, or for a more advanced
-example: "--ignore-pattern '(foo|bar|baz)'" would ignore all
-podcasts containing either of the words foo, bar or baz in it's
-filename. Like everything else the --ignore-pattern expression is case sensitive.
-If you would like to match both Foo and foo you could do: "--ignore-pattern [f|F]oo".
---ignore-pattern supports standard perl regular expressions (will be executed within m//).
+For example: "--ignore-pattern foo" would ignore any podcast containing the
+word "foo" in its filename, or for a more advanced example: "--ignore-pattern
+'(foo|bar|baz)'" would ignore all podcasts containing either of the words foo,
+bar or baz in it's filename. Like everything else the --ignore-pattern
+expression is case sensitive.  If you would like to match both Foo and foo you
+could do: "--ignore-pattern [f|F]oo".  --ignore-pattern supports standard perl
+regular expressions (will be executed within m//).
 
 =item B<--clean>
 
-Clean up the podcasts directory and catalogue. This is useful if you removed files
-by hand. It will remove empty directories, remove orphaned symlinks in the catalogue
-and rewrite playlists. This is also done after --rmold.
+Clean up the podcasts directory and catalogue. This is useful if you removed
+files by hand. It will remove empty directories, remove orphaned symlinks in
+the catalogue and rewrite playlists. This is also done after --rmold.
 
 =back
 
@@ -1315,12 +1425,12 @@ Besides from perl it also requires curl.
 
 =head1 INCOMPATIBILITIES
 
-This version of GoldenPod uses a new configuration syntax that is not
-backwards compatible with GoldenPod versions 0.1 to 0.6 (however it can
-upgrade the old configuration syntax to the new one).
+This version of GoldenPod uses a new configuration syntax that is not backwards
+compatible with GoldenPod versions 0.1 to 0.6 (however it can upgrade the old
+configuration syntax to the new one).
 
-The directories created by this version will always be YYYY-MM-DD, while
-0.1 to 0.6 could be YYYY-MM-D.
+The directories created by this version will always be YYYY-MM-DD, while 0.1 to
+0.6 could be YYYY-MM-D.
 
 =head1 AUTHOR
 
@@ -1342,8 +1452,8 @@ want to use the PodcastFilter.
 
 =item I<~/.goldenpod/podcasts.log> or I<./podcasts.log>
 
-The logfile containing the URLs for the podcasts already downloaded.
-This file will be I<podcast.log> if working in bashpodder compatibility mode.
+The logfile containing the URLs for the podcasts already downloaded.  This file
+will be I<podcast.log> if working in bashpodder compatibility mode.
 
 =item I<~/.goldenpod/goldenpod.log> or I<./goldenpod.log>
 
@@ -1351,15 +1461,26 @@ The logfile written to when in silent mode.
 
 =item I</etc/goldenpod-podcasts.conf>
 
-This is a file in the same syntax as podcasts.conf. It is copied to ~/.goldenpod/podcasts.conf
-the first time goldenpod is run if it exists. This file is never read directly, and has no
-effect whatsoever after the first time goldenpod is run.
+This is a file in the same syntax as podcasts.conf. It is copied to
+~/.goldenpod/podcasts.conf the first time goldenpod is run if it exists. This
+file is never read directly, and has no effect whatsoever after the first time
+goldenpod is run.
 
 =back
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (C) Eskild Hustvedt 2005, 2006, 2007
+Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009
 
-This is free software; see the source for copying conditions.  There is NO
-warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see L<http://www.gnu.org/licenses/>.
