@@ -20,6 +20,10 @@ install:
 	cp gpconf "$(BINDIR)"
 	cp -r art "$(DATADIR)/goldenpod"
 	chmod 755 "$(BINDIR)/goldenpod" "$(BINDIR)/gpconf"
+localinstall:
+	mkdir -p "$(BINDIR)"
+	ln -sf $(shell pwd)/goldenpod $(BINDIR)/
+	[  -e goldenpod.1 ] && mkdir -p "$(DATADIR)/man/man1" && ln -sf $(shell pwd)/goldenpod.1 "$(DATADIR)/man/man1" || true
 # Unisntall an installed goldenpod
 uninstall:
 	rm -f "$(BINDIR)/goldenpod" "$(BINDIR)/gpconf"
