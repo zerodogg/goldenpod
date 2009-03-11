@@ -33,7 +33,7 @@ use IPC::Open2;
 # Using true/false is easier to read than 0/1
 use constant { true => 1, false => 0 };
 # Allow bundling of options with GeteOpt
-Getopt::Long::Configure ("bundling", 'prefix_pattern=(--|-)');
+Getopt::Long::Configure ('bundling', 'prefix_pattern=(--|-)');
 
 # Global scalars
 my (
@@ -49,7 +49,7 @@ my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config);
 # Version number
 my $Version = '0.7';			# My version
 # Default is that curl is silent but displays errors (logged, not to STDOUT)
-my @CurlVerbosity = ("--silent","--show-error");
+my @CurlVerbosity = qw(--silent --show-error);
 # Curl options:
 # -C to continue when possible
 # -k for insecure (allow ssl servers with odd certificates)
@@ -60,9 +60,17 @@ my @CurlGlobal = ( qw(-C -k -L -A),"GoldenPod $Version - http://goldenpod.nongnu
 # Get the current date
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 $year += 1900;					# The year doesn't have the format we want
-$mon++; $mon = PrependZero($mon);		# Make the month be 1-12 instead of 0-11 and add a 0 prefix to 1-9
-$mday = PrependZero($mday);			# Append a zero to the mday too
+$mon++; $mon = PrefixZero($mon);		# Make the month be 1-12 instead of 0-11 and add a 0 prefix to 1-9
+$mday = PrefixZero($mday);			# Append a zero to the mday too
 my $date = "$year-$mon-$mday"; 			# The date in the international date format
+
+# This makes sure children are slayed properly and their return values
+# are kept (in the %ReturnVals hash)
+$SIG{CHLD} = sub
+{
+	my $PID = wait;
+	return(1);
+};
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Help function declerations
@@ -151,7 +159,7 @@ sub Help
 	PrintHelp('', '--stats', 'Print some simple statistics');
 	PrintHelp('-l', '--nolog', 'Don\'t create a message logfile when in non-verbose mode.');
 	PrintHelp('-u', '--dry-run', 'Display what would be done but don\'t do it. Implies --verbose');
-	PrintHelp('-w', '--no-download', 'Act as if all pending podcasts are downloaded but don\'t actually download anything. Implies --verbose.');
+	PrintHelp('-w', '--no-download','Mark all podcasts as downloaded. Implies --verbose.');
 	PrintHelp('-f', '--first-only', 'Only download the first file in any feed. Permanently ignore the others.');
 	PrintHelp('-c', '--copy [path]', 'Copy the last N downloaded files to path. N is either 4 or the number supplied to --files.');
 	PrintHelp('-n', '--files N', 'Copy N files instead of 4 (use with --copy or --rmold)');
@@ -220,7 +228,7 @@ sub DirIsEmpty
         return false;
 }
 
-# Purpose: Clear the screen if possible
+# Purpose: Clear the screen
 # Usage: Clear();
 sub Clear
 {
@@ -258,9 +266,9 @@ sub DownloadURL
 	return($DownloadStatus);
 }
 
-# Purpose: Prepend a "0" to a number if it is only one digit.
-# Usage: my $NewNumber = PrependZero(NUMBER);
-sub PrependZero
+# Purpose: Prefix a "0" to a number if it is only one digit.
+# Usage: my $NewNumber = PrefixZero(NUMBER);
+sub PrefixZero
 {
 	if ($_[0] =~ /^\d$/)
 	{
@@ -1266,7 +1274,7 @@ GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 	},
 	'ignore-pattern|ignorepattern|i=s' => sub {
 		$IgnorePattern = $_[1];
-		eval { qr/$IgnorePattern/ } or die "The regexp supplied to --ignore-pattern is invalid.\n";
+		eval { qr/$IgnorePattern/ } or die "The regexp supplied to --ignore-pattern is invalid ($@)\n";
 	},
 	# Display some simple statistics
 	'stats' => sub { die "The \"catalogue/All\" directory did not exist, are you sure you have downloaded anything?\n" unless -d "$Config{WorkingDir}/catalogue/All";
@@ -1309,7 +1317,7 @@ DeleteOldPodcasts() if $RemoveOldFiles;
 # if --ignore-pattern was not supplied but $IgnorePattern is set in the config file.
 unless ($IgnorePattern) {
 	if ($Config{IgnorePattern}) {
-		eval { qr/$Config{IgnorePattern}/ } or die "The regexp IgnorePattern in the configuration file is invalid!\n";
+		eval { qr/$Config{IgnorePattern}/ } or die "The regexp IgnorePattern in the configuration file is invalid ($@)\n";
 		$IgnorePattern = $Config{IgnorePattern};
 	}
 }
@@ -1427,18 +1435,15 @@ actually copy or delete anything.  Implies B<--verbose>
 
 =item B<-w, --no-download>
 
-Only write the logfile, don't download anything. Useful when you want to
-subscribe to a podcast but not download all of the old issues. You can edit the
-logfile afterwards and remove those you want to download.  Implies
-B<--verbose>.
+Mark all podcasts as downloaded.  Useful when you want to subscribe to a
+podcast but not download all of the old issues. You can edit the logfile
+afterwards and remove those you want to download.  Implies B<--verbose>.
 
 =item B<-f, --first-only>
 
-Only download the first file in any feed, permanently ignore the others.  So
-running --first-only will fetch the first file in the feed, and then
-permanently ignore any older ones - but will (unless you use --first-only)
-download all later files. If you want to download any older you will need to
-edit the logfile.  Unlike --no-download this does not imply --verbose
+Download the first file in any feed, and then permanently ignore the others.
+If you at any later point want to download older files, you will need to edit
+the logfile. Unlike --no-download this does not imply --verbose.
 
 =item B<-c, --copy I</path>>
 
