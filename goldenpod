@@ -71,7 +71,8 @@ my $date = "$year-$mon-$mday"; 			# The date in the international date format
 # Purpose: Print formatted --help output
 # Usage: PrintHelp('-shortoption', '--longoption', 'description');
 #  Description will be reformatted to fit within a normal terminal
-sub PrintHelp {
+sub PrintHelp
+{
 	# The short option
 	my $short = shift,
 	# The long option
@@ -174,15 +175,18 @@ sub Version
 # Purpose: print() something if we're verbose
 # Usage: printv(OPTS);
 #  OPTS are identical to print();
-sub printv {
-	if($Verbose) {
+sub printv
+{
+	if($Verbose)
+	{
 		print(@_);
 	}
 }
 
 # Purpose: Prepare logging (if needed)
 # Usage: PrepareLogging();
-sub PrepareLogging {
+sub PrepareLogging
+{
 	# Unless we're verbose, write stuff to $ProgramLog
 	open(STDOUT, ">>",$ProgramLog) unless $NoLog;
 	open(STDERR, ">>",$ProgramLog) unless $NoLog;
@@ -196,18 +200,21 @@ sub PrepareLogging {
 
 # Purpose: Check for a file in path
 # Usage: InPath(FILE)
-sub InPath {
+sub InPath
+{
 	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and ! -d "$_/@_" ) {	return "$_/@_"; } } return false;
 }
 
 # Purpose: Check if a directory is empty
 # Usage: DirIsEmpty(PATH);
 #  Returns 1 if it is empty, 0 if it isn't.
-sub DirIsEmpty {
+sub DirIsEmpty
+{
         opendir(TESTDIR, $_[0]);
         my @TestDir = readdir(TESTDIR);
         closedir(TESTDIR);
-        unless (scalar @TestDir > 2) {
+        unless (scalar @TestDir > 2)
+		{
                 return true;
         }
         return false;
@@ -215,25 +222,37 @@ sub DirIsEmpty {
 
 # Purpose: Clear the screen if possible
 # Usage: Clear();
-sub Clear {
+sub Clear
+{
 	# Don't call it if we're not in verbose mode
 	return(0) if(not $Verbose);
-	if (InPath("clear")) {
-		system("clear");
+
+	# Use the system clear command if present
+	if (InPath('clear'))
+	{
+		system('clear');
+	}
+	else
+	{
+		# Otherwise, fall back to working perl hack
+		print "\n" foreach(1..120);
+		print "\b\r" foreach(1..120);
 	}
 }
 
 # Purpose: Download a URL
 # Usage: DownloadURL(ToDir, URL);
 #  Also handles creating the ToDir
-sub DownloadURL {
+sub DownloadURL
+{
 	my ($ToDir, $URL) = @_;
 	my $CWD = getcwd();
-	if(not -d $ToDir) {
+	if(not -d $ToDir)
+	{
 		mkdir($ToDir) or die("Unable to mkdir $ToDir: $!\n");
 	}
 	chdir($ToDir);
-	my $DownloadStatus = system("curl", @CurlGlobal, @CurlVerbosity, "-O", $URL);
+	my $DownloadStatus = system('curl', @CurlGlobal, @CurlVerbosity, '-O', $URL);
 	chdir($CWD);
 	$DownloadStatus = $DownloadStatus >> 8;
 	return($DownloadStatus);
@@ -241,8 +260,10 @@ sub DownloadURL {
 
 # Purpose: Prepend a "0" to a number if it is only one digit.
 # Usage: my $NewNumber = PrependZero(NUMBER);
-sub PrependZero {
-	if ($_[0] =~ /^\d$/) {
+sub PrependZero
+{
+	if ($_[0] =~ /^\d$/)
+	{
 		return("0$_[0]");
 	}
 	return($_[0]);
@@ -250,7 +271,8 @@ sub PrependZero {
 
 # Purpose: Get OS/distro version information
 # Usage: print "OS: ",GetDistVer(),"\n";
-sub GetDistVer {
+sub GetDistVer
+{
 	# Try LSB first
 	my %LSB;
 	if (-e '/etc/lsb-release')
@@ -353,7 +375,8 @@ sub GetDistVer {
 
 # Purpose: Display useful information
 # Usage: DumpInfo();
-sub DumpInfo {
+sub DumpInfo
+{
 	Version();
 	print "\n";
 	my $pattern = "%-28s: %s\n";
@@ -362,7 +385,8 @@ sub DumpInfo {
 	printf($pattern, 'Logfile',$ProgramLog) if ($Verbose and not $NoLog);
 	printf($pattern, 'List of downloaded podcasts',$PodcastLog);
 	printf($pattern, 'Target download directory',$Config{WorkingDir});
-	if($_[0]) {
+	if($_[0])
+	{
 		printf($pattern, 'Perl version', sprintf('%vd',$^V));
 		printf($pattern, 'OS',GetDistVer());
 		eval('use Digest::MD5;');
@@ -386,10 +410,12 @@ sub DumpInfo {
 
 # Purpose: Adds all items in %NoDownload to the logfile
 # Usage: PerformNoDownload();
-sub PerformNoDownload {
+sub PerformNoDownload
+{
 	printv("\nWriting older podcasts to the logfile...") if not $FirstOnly;
 	open(my $LOGFILE, ">>",$PodcastLog);
-	foreach (keys (%NoDownload)) {
+	foreach (keys (%NoDownload))
+	{
 		print $LOGFILE "$_\n" unless $AlreadyDownloaded{$_};
 	}
 	printv(" done\n") if not $FirstOnly;
@@ -402,10 +428,12 @@ sub PerformNoDownload {
 
 # Purpose: Returns the value supplied to --files or 4
 # Usage: HowManyFiles();
-sub HowManyFiles {
+sub HowManyFiles
+{
 	my $FileCount = $FileNumber ? $FileNumber : 4;
 	# Unless it's an integer we can't continue
-	if ($FileCount =~ /\D/) {
+	if ($FileCount =~ /\D/)
+	{
 		die "Error: The option passed to --files ($FileCount) is not an integer number.\n";
 	}
 	return $FileCount;
@@ -415,52 +443,59 @@ sub HowManyFiles {
 #  and returns an array containing them.
 # Usage: my @List = SortedFileList();
 # NOTE: Ignores files that aren't symlinks.
-sub SortedFileList {
+sub SortedFileList
+{
 	my $FromDir = shift;
 	my (@SortedFileList, %FileCopyList);
 	
 	# For compatibility with older GoldenPods
 	my $CWD = getcwd();
 	chdir($FromDir);
-        # Create a hash of possible filenames
-        foreach my $FileName (glob("$FromDir/*")) {
+	# Create a hash of possible filenames
+	foreach my $FileName (glob("$FromDir/*"))
+	{
 		# Is it a link? If it isn't then we don't bother testing it
 		next unless -l $FileName;
-                # If the link points to something that doesn't exist them we omit it.
-                if (-e (readlink $FileName)) {
+		# If the link points to something that doesn't exist them we omit it.
+		if (-e (readlink $FileName))
+		{
 			# We don't care about directories
 			unless (-d $FileName) {
-	                        $FileCopyList{Cwd::realpath(readlink($FileName))} = 1;
+				$FileCopyList{Cwd::realpath(readlink($FileName))} = 1;
 			}
-                }
-        }
-        # Create a sorted array of filenames
-        # map { [ $_, -M $_||0 ] } keys(%FileCopyList); = that means make a two dimensional array so that $_->[0]="filename.txt" and $_->[1] is the -M value
-        # sort { $a->[1] <=> $b->[1] } = sort the array we just thought of by the $_->[1] index, ie the -M times
-        # map { $_->[0] } take the sorted array and convert it back to a plain list of filenames by reading out the $_->[0] values.  These are now in the right order as they are sorted
-        @SortedFileList = map { $_->[0] } sort { $a->[1] <=> $b->[1] } map { [ $_, -M $_ ] } keys(%FileCopyList);
+		}
+	}
+	# Create a sorted array of filenames
+	# map { [ $_, -M $_||0 ] } keys(%FileCopyList); = that means make a two dimensional array so that $_->[0]="filename.txt" and $_->[1] is the -M value
+	# sort { $a->[1] <=> $b->[1] } = sort the array we just thought of by the $_->[1] index, ie the -M times
+	# map { $_->[0] } take the sorted array and convert it back to a plain list of filenames by reading out the $_->[0] values.  These are now in the right order as they are sorted
+	@SortedFileList = map { $_->[0] } sort { $a->[1] <=> $b->[1] } map { [ $_, -M $_ ] } keys(%FileCopyList);
 	chdir($CWD);
 	return @SortedFileList;
 }
 
 # Purpose: Clean up the catalogue.
 # Usage: CleanCatalogue();
-sub CleanCatalogue {
+sub CleanCatalogue
+{
 	my $CatalogueBase = shift;
 	die("Catalogue didn't exist. Maybe you haven't downloaded anything yet?\n") if not -e $CatalogueBase;
 	# For compatibility with older GoldenPods
 	my $CWD = getcwd();
 	chdir($CatalogueBase);
 	print "Cleaning up the catalogue...";
-	foreach my $CurrentDirectory (glob("$CatalogueBase/*")) {
+	foreach my $CurrentDirectory (glob("$CatalogueBase/*"))
+	{
 		chdir($CurrentDirectory);
-		foreach my $CurrentFile (glob("$CurrentDirectory/*")) {
+		foreach my $CurrentFile (glob("$CurrentDirectory/*"))
+		{
 			next unless -l $CurrentFile;
-			unless (-e readlink($CurrentFile)) {
+			unless (-e readlink($CurrentFile))
+			{
 				unlink($CurrentFile);
 			}
 		}
-		chdir("..");
+		chdir('..');
 	}
 	chdir($CWD);
 	print "done\n";
@@ -468,9 +503,11 @@ sub CleanCatalogue {
 
 # Purpose: Remove empty directories in ./
 # Usage: RemoveEmptyDirs();
-sub RemoveEmptyDirs {
+sub RemoveEmptyDirs
+{
 	my $FromDirectory = shift;
-	foreach my $Directory (glob("$FromDirectory/*")) {
+	foreach my $Directory (glob("$FromDirectory/*"))
+	{
 		next unless -d $Directory;
 		rmdir($Directory) if DirIsEmpty($Directory);
 	}
@@ -480,11 +517,13 @@ sub RemoveEmptyDirs {
 # Usage: RewritePlaylists(Base CatalogueDir);
 #  Call this before you delete directories to remove old playlists that are no
 #  longer used.
-sub RewritePlaylists {
+sub RewritePlaylists
+{
 	my $CatalogueBase = shift;
 	print "Rewriting playlists...";
 	my $CWD = getcwd();
-	foreach (glob("$CatalogueBase/*")) {
+	foreach (glob("$CatalogueBase/*"))
+	{
 		next unless -d $_;
 		# Skip the All directory
 		# FIXME: Don't blindly assume there are no other dirs ending in All
@@ -496,14 +535,16 @@ sub RewritePlaylists {
 		# Remove the old playlist if it exists
 		unlink("$_/$DirName.m3u") if -e "$_/$DirName.m3u";
 		# Skip directory if it's empty
-		if(DirIsEmpty($_)) {
+		if(DirIsEmpty($_))
+		{
 			next;
 		}
 		# Open our new playlist
 		open(my $PLAYLIST, ">", "$_/$DirName.m3u");
 		chdir($_);
 		# Create the playlist based upon the output of SortedFileList
-		foreach my $CurrentFile (SortedFileList($_)) {
+		foreach my $CurrentFile (SortedFileList($_))
+		{
 			# Skip playlists
 			next if $CurrentFile =~ /\.m3u$/;
 			# Add to the playlist
@@ -519,7 +560,8 @@ sub RewritePlaylists {
 
 # Purpose: Clean up our directories
 # Usage: CleanupDirs();
-sub CleanupDirs {
+sub CleanupDirs
+{
 	# Flush the output buffer faster.
 	$| = 1;
 	# Set the path to the Catalogue
@@ -533,7 +575,8 @@ sub CleanupDirs {
 	RemoveEmptyDirs($CatalogueDirectory);
 	RemoveEmptyDirs($Config{WorkingDir});
 	print "done\n";
-	if(-e ("$Config{WorkingDir}/latest") and not readlink("$Config{WorkingDir}/latest")) {
+	if(-e ("$Config{WorkingDir}/latest") and not readlink("$Config{WorkingDir}/latest"))
+	{
 		unlink("$Config{WorkingDir}/latest");
 	}
 }
@@ -544,7 +587,8 @@ sub CleanupDirs {
 
 # Purpose: Delete old podcasts
 # Usage: DeleteOldPodcasts();
-sub DeleteOldPodcasts {
+sub DeleteOldPodcasts
+{
 	my $CatalogueDirectory = "$Config{WorkingDir}/catalogue/";
 	# Declare variables
 	my (@FileList, %Files, @RemoveTheseFiles);
@@ -557,9 +601,11 @@ sub DeleteOldPodcasts {
 	# We don't allow the user to delete the last remaining podcast.
 	die("Only one podcast has been downloaded. If you really want to delete it you must do so manually\n") if $PodcastCount == 1;
 	# Make sure we don't delete more than the total amount of podcasts minus one
-	if ($NumberOfFiles >= $PodcastCount) {
+	if ($NumberOfFiles >= $PodcastCount)
+	{
 		my $ErrorNo = $NumberOfFiles;
-		while($NumberOfFiles >= $PodcastCount) {
+		while($NumberOfFiles >= $PodcastCount)
+		{
 			$NumberOfFiles--;
 		}
 		warn "$ErrorNo is higher than the total amount of podcasts ($PodcastCount). Using $NumberOfFiles instead\n";
@@ -568,15 +614,22 @@ sub DeleteOldPodcasts {
 	my $DeletedFiles = 0;
 	while ($NumberOfFiles > $DeletedFiles) {
 		my $TargetBase = basename($FileList[0]);
-		unless ($IgnorePattern and $TargetBase =~ /$IgnorePattern/) {
+		unless ($IgnorePattern and $TargetBase =~ /$IgnorePattern/)
+		{
 			# If we're in dry run mode then we don't want to actually do anything.
-			if ($DryRun_Mode) {
+			if ($DryRun_Mode)
+			{
 				print "Would delete $TargetBase\n";
-			} else {
+			}
+			else
+			{
 				print "Deleting $TargetBase...";
-				if(unlink($FileList[0])) {
+				if(unlink($FileList[0]))
+				{
 					print "done\n";
-				} else {
+				}
+				else
+				{
 					print "failed: $!\n";
 				}
 			}
@@ -593,7 +646,8 @@ sub DeleteOldPodcasts {
 
 # Purpose: Copy files to $CopyFilesTo
 # Usage: CopyFiles();
-sub CopyFiles {
+sub CopyFiles
+{
 	# Declare variables
 	my (@FileList, %Files, @CopyTheseFiles, %DontDeleteThese);
 	my $NumberOfFiles = HowManyFiles();
@@ -608,56 +662,70 @@ sub CopyFiles {
 	@FileList = SortedFileList("$Config{WorkingDir}/catalogue/All/");
 	# Create an array of the files we should copy
 	my $CopiedFiles = 0;
-	while (defined($FileList[$CopiedFiles]) and $CopiedFiles < $NumberOfFiles) {
+	while (defined($FileList[$CopiedFiles]) and $CopiedFiles < $NumberOfFiles)
+	{
 		my $TargetBase = basename($FileList[$CopiedFiles]);
 		# Check if we want to skip files matching a specific regexp
-		unless ($IgnorePattern and $TargetBase =~ /$IgnorePattern/) {
+		unless ($IgnorePattern and $TargetBase =~ /$IgnorePattern/)
+		{
 			push(@CopyTheseFiles, $FileList[$CopiedFiles]);
 			$DontDeleteThese{$TargetBase} = 1;
 			$CopiedFiles++;
-		} else {
+		}
+		else
+		{
 			shift(@FileList);
 		}
 	}
 	# Delete routine (delete files unless we would have copied it)
-	if ($CopyFiles_Delete) {
+	if ($CopyFiles_Delete)
+	{
 		# Time to delete files in the target directory
 		
 		# Babysitting the user :)
 		if($CopyFilesTo =~ m#^($ENV{HOME}(/|/Documents/?.*)|/(usr|var|dev|etc|lib|sbin|sys|boot|proc)/?.*)$#) {
 			die "Not allowed to delete in the directory \"$CopyFilesTo\"\n";
-		}
+			}
 		# Delete the files
-		while ($_ = glob("$CopyFilesTo/*")) {
+		while ($_ = glob("$CopyFilesTo/*"))
+		{
 			my $TargetBase = basename($_);
 			# This one is merely cosmetic
 			$_ =~ s#//#/#g;
 			# If it is in the $DontDeleteThis hash or is a directory we skip it.
 			next if $DontDeleteThese{$TargetBase} or -d $_;
 			# If we're in dry run mode we don't want to actually do anything
-			if ($DryRun_Mode) {
+			if ($DryRun_Mode)
+			{
 				print "Would delete $_\n";
-			} else {
+			}
+			else
+			{
 				print "Deleting $_\n";
 				unlink("$_") or warn "Deleting of $_ failed: $!\n";
 			}
 		}
 	}
 	# Copy the files
-	foreach (@CopyTheseFiles) {
+	foreach (@CopyTheseFiles)
+	{
 		my $TargetBase = basename($_);
 		printv("Skipping pre-existing \"$TargetBase\"\n") if -e "$CopyFilesTo/$TargetBase";
 		next if -e "$CopyFilesTo/$TargetBase";
 		# If we're in dry run mode we don't want to actually do anything
-		if ($DryRun_Mode) {
+		if ($DryRun_Mode)
+		{
 			print "Would copy $TargetBase\n";
-		} else {
+		}
+		else
+		{
 			print "Copying $TargetBase...\n";
 			copy("$_", "$CopyFilesTo") or die "Copying failed: $!\n";
 		}
 	}
 	# And finally, attempt to run sync once.
-	if (InPath "sync" and not $DryRun_Mode) {
+	if (InPath "sync" and not $DryRun_Mode)
+	{
 		printv("Synchronizing disks...");
 		system("sync");
 	}
@@ -949,7 +1017,8 @@ sub ParseFeed
 
 # Purpose: Download podcasts contained in the supplied array reference
 # Usage: DownloadPodcasts(ARRAYREF);
-sub DownloadPodcasts {
+sub DownloadPodcasts
+{
 	my $DownloadThese = shift;
 	my $NeedToDownload = scalar(@{$DownloadThese});
 	my @DownloadedFiles;
@@ -987,7 +1056,8 @@ sub DownloadPodcasts {
 
 # Purpose: Create the catalogue entries for the current date
 # Usage: CreateCatalogue();
-sub CreateCatalogue {
+sub CreateCatalogue
+{
 	my $Downloaded = shift;
 	# Filename filter
 	# Remove junk after .EXTension and convert %20 to _
@@ -1051,7 +1121,8 @@ sub CreateCatalogue {
 
 # Purpose: Fetch and parse the feeds
 # Usage: FetchFeeds();
-sub FetchFeeds {
+sub FetchFeeds
+{
 	# Is the config file empty?
 	my $ConfIsNotEmpty = 0;
 	# The list of podcasts to download
@@ -1144,7 +1215,8 @@ sub FetchFeeds {
 
 # Purpose: The main function
 # Usage: main();
-sub main {
+sub main
+{
 	# First prepare logging.
 	PrepareLogging();
 	# Then fetch and parse our feeds.
