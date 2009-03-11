@@ -1,0 +1,73 @@
+#!/usr/bin/perl
+# SetVersion
+# Simple tool to change the current version number in all source files.
+# Copyright (C) Eskild Hustvedt 2006
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+use strict;
+use warnings;
+use Cwd qw/realpath getcwd/;
+use File::Basename qw/dirname basename/;
+
+my @FilePaths = qw(goldenpod Makefile);
+
+unless (defined($ARGV[0]) and length($ARGV[0])) {
+	die("Usage: " . basename($0) . " version.number\n");
+}
+
+die("\@FilePaths is not set\n") unless(@FilePaths);
+
+my $NewVersion = $ARGV[0];
+
+my $OrigDir = dirname(realpath($0));
+
+sub GetFile ($) {
+	my $File = $_[0];
+	unless(-e "$OrigDir/$File") {
+	        $OrigDir = "$OrigDir/../";
+	        unless (-e "$OrigDir/$File") {
+	                $OrigDir = "$OrigDir/../../";
+	                unless (-e "$OrigDir/$File") {
+				warn("failed. Unable to detect the location of $File\n");
+				return(undef);
+	                }
+	        }
+	}
+	return("$OrigDir$File");
+}
+
+$OrigDir = realpath($OrigDir);
+print "Working...\n";
+foreach my $CurrentFile (@FilePaths) {
+	print " $CurrentFile...";
+	$CurrentFile = GetFile($CurrentFile);
+	next unless defined($CurrentFile);
+	
+	open(FILE, "<", "$CurrentFile") or die "Unable to open $CurrentFile: $!\n";
+	my @File;
+	foreach(<FILE>) {
+		s/^(my\s+\$D?P?Version\s+=\s+["']).*(["'];)/$1$NewVersion$2/i;
+		push(@File, $_);
+	}
+	close(FILE);
+	
+	open(WRITE_FILE, ">","$CurrentFile") or die "Unable to open $CurrentFile for writing: $!\n";
+	foreach(@File) {
+		print WRITE_FILE $_;
+	}
+	close(WRITE_FILE);
+
+	print "done\n";
+}

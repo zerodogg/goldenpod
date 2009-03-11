@@ -1,0 +1,101 @@
+GoldenPod changelog
+
+0.7
+- - - -
+- Fixed handling of the catalogue when deleting files
+- Optimized some of the regular expressions
+- Removed use of subshells
+- MAJOR cleanups
+- Added --clean
+- Added a Makefile
+
+0.6
+- - - -
+[ADDED]	GoldenPod graphical configurator (gpconf)
+[CHANGED] Now ignores lines that only contain whitespace in the podcasts.conf
+	file.
+[ADDED]	A help/support section to the manpage
+[CHANGED] No longer calls curl with --retry-max-time
+
+0.5
+- - - -
+[CHANGED] The message displayed when the file to be copied by --copy
+	already existed to make it easier to read.
+[FIXED]	Will now only print a newline if we're really in verbose mode.
+	On systems that had DefaultVerbosity set to 1 and then ran
+	GoldenPod with --silent would still get a newline printed
+	to STDOUT.
+[FIXED]	Will now accept some weird feeds (still valid XML)
+	that has space between "url" and "=", ex: url = "blah"
+	instead of url="blah".
+[CHANGED] Some minor cosmetic changes to a few messages
+[CHANGED] Now converts %20 to _
+[CHANGED] Added a long range of audio file formats to the podcast filter
+[CHANGED] Made some changes to the manpage to make it easier to understand
+[CHANGED] Dry run now also supports standard (download) mode
+[CHANGED] Now favours goldenpod's config files over bashpodder's when both
+	exists.
+[CHANGED] Now defaults to being verbose (only affects NEW installations,
+	set DefaultVerbosity in the config to 0 to make it silent by default)
+
+0.4
+- - - -
+[CLEANUP] Cleaned up some of the code
+[ADDED]	A --rmold function. Deletes N old podcasts where N is 4 or the number
+	supplied to --files.
+[FIXED]	If you supply a number to --files that is higher than the total number
+	of podcasts then goldenpod will not continue to loop but will set the
+	number to:
+	- Total amount of podcasts minus one if working in --rmold
+	- Total amount of podcasts if working in --copy
+[CHANGED] Removed some redundant text from --help that is better covered
+	in the manpage.
+[CHANGED] Some minor changes to the manpage provided by Viking667
+[CHANGED] Commented some of the code better
+[CHANGED] Renamed the old --dry-run to --no-download
+[ADDED]	A _NEW_ --dry-run that applies to --copy and --rmold:
+	- Display what would be done, but don't actually do anything.
+[FIXED]	Both --dry-run and --delete used the short option -d
+	the new -dry-run uses -u, --no-download uses -w.
+[CHANGED] Improved documentation for --ignore-pattern
+[ADDED]	--stats, display some simple statistics
+[CHANGED] Renamed /etc/goldenpod.conf to /etc/goldenpod-podcasts.conf
+[FIXED]	Some grammar here and there *sigh*
+
+0.3
+- - - - -
+[CHANGED] Minor changes to some comments in the config files
+[CHANGED] The message printed when performing --copy and the file exists
+[CHANGED] The short option for --copy is now -c (not -p)
+[REMOVED] The --nocat option, was not really that useful. If you used it
+	then please give some feedback about that and I'll bring it back.
+[ADDED]	--ignore-pattern, regexp match to perform on files to copy/download.
+	If it matches, goldenpod will not download or copy the file.
+[ADDED]	A $IgnorePattern option in the configuration file. The same as
+	--ignore-pattern (--ignore-pattern overrides this config option)
+[CHANGED] The short option for --files is now -n (not -i)
+[CHANGED] Now it doesn't display the help screen when invalid options
+	or syntaxes for options are supplied, but tells you to run
+	goldenpod --help for help.
+
+0.2
+- - - - -
+[CHANGED] Minor code cleanups
+[CHANGED] Now dies if you use --files without --copy
+[ADDED]	Usage statement to --help
+[FIXED]	Now doesn't download the same file twice
+	with some weird feeds.
+[CHANGED] goldenpod will now never rewrite the logfile, but add to it
+	even when in --dry-run mode.
+[CHANGED] Now the same entry _should_ never appear twice in the logfile.
+[CHANGED] The help text for --verbose and --silent now reacts to your
+	$DefaultVerbosity setting.
+[CHANGED] Now attempts to run sync after copying.
+[ADDED]	A PodcastFilter setting (set to 0 by default).
+	- Makes sure goldenpod only downloads audio podcasts
+[FIXED]	If a file in All doesn't exist, perl errors will not occur
+[FIXED]	Made sure --first-only doesn't get put into the logfile if it fails
+	to download.
+
+0.1
+- Initial release

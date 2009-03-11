@@ -1,0 +1,1357 @@
+#!/usr/bin/perl
+# GoldenPod version 0.7
+# Copyright (C) Eskild Hustvedt 2005, 2006, 2007
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Enforce strict coding practices and warnings
+use strict;
+use warnings;
+# Die when one of these fails
+use Fatal qw/ open chdir mkdir /;
+# Used to find our directory and name
+use File::Basename;
+# We need realpath and getcwd
+use Cwd qw(getcwd realpath);
+# Parsing of commandline parameters
+use Getopt::Long;
+# Copying files
+use File::Copy;
+# open() call to commands
+use IPC::Open2;
+# Using true/false is easier to read than 0/1
+use constant { true => 1, false => 0 };
+# Allow bundling of options with GeteOpt
+Getopt::Long::Configure ("bundling", 'prefix_pattern=(--|-)');
+
+# Global scalars
+my (
+	$Config,	$Verbose,	$NoDownload,
+	$NoLog,		$FirstOnly,	$CopyFiles_Delete,
+	$ConfigDir,	$UserConfigDir,	$IgnorePattern,
+	$RemoveOldFiles,$DryRun_Mode,	$CopyFilesTo,
+	$FileNumber,	$PodcastLog,	$ProgramLog,
+);
+# Global hashes
+my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config);
+
+# Version number
+my $Version = "0.7";			# My version
+# Default is that curl is silent but displays errors (logged, not to STDOUT)
+my @CurlVerbosity = ("--silent","--show-error");
+# Curl options:
+# -C to continue when possible
+# -k for insecure (allow ssl servers with odd certificates)
+# -L to follow location hints
+# -A sets the user agent string
+my @CurlGlobal = ( "-C","-k","-L","-A","GoldenPod $Version - http://goldenpod.nongnu.org/");
+
+# Get the current date
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+$year += 1900;					# The year doesn't have the format we want
+$mon++; $mon = PrependZero($mon);		# Make the month be 1-12 instead of 0-11 and add a 0 prefix to 1-9
+$mday = PrependZero($mday);			# Append a zero to the mday too
+my $date = "$year-$mon-$mday"; 			# The date in the international date format
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Help function declerations
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: Print formatted --help output
+# Usage: PrintHelp("-shortoption", "--longoption", "description");
+sub PrintHelp {
+	printf "%-4s %-16s %s\n", "$_[0]", "$_[1]", "$_[2]";
+}
+
+# Purpose: Output the program --help info.
+# Usage: Help();
+sub Help {
+	$PodcastLog =~ s/$ENV{HOME}/~/;
+	Version();
+	printf("\nUsage: %s", basename($0));
+	printf("\n  or : %s [OPTIONS]\n\n", basename($0));
+	PrintHelp("", "--version", "Display version information and exit");
+	PrintHelp("-h", "--help", "This help screen");
+	# Inform the user about the default based upon the value of $Config{DefaultVerbosity}
+	if ($Config{DefaultVerbosity}) {
+		PrintHelp("-v", "--verbose", "Be verbose (default)");
+		PrintHelp("-s", "--silent", "Be silent");
+	} else {
+		PrintHelp("-v", "--verbose", "Be verbose");
+		PrintHelp("-s", "--silent", "Be silent (default)");
+	}
+	PrintHelp("", "--dumpinfo", "Print the files goldenpod would work with");
+	PrintHelp("", "--stats", "Print some simple statistics");
+	PrintHelp("-l", "--nolog", "Don't create a message logfile when in non-verbose mode.");
+	PrintHelp("-u", "--dry-run", "Display what would be done but don't do it. Implies --verbose");
+	PrintHelp("-w", "--no-download", "Act as if all pending podcasts are downloaded");
+	PrintHelp("", "", "but don't actually download anything. Implies --verbose");
+	PrintHelp("-f", "--first-only", "Only download the first file in any feed.");
+	PrintHelp("", "", "Permanently ignore the others.");
+	PrintHelp("-c", "--copy [path]", "Copy the last N downloaded files to path.");
+	PrintHelp("", "", "N is either 4 or the number supplied to --files.");
+	PrintHelp("-n", "--files N", "Copy N files instead of 4 (use with --copy or --rmold)");
+	PrintHelp("-d", "--delete", "Delete all other files in the target --copy");
+	PrintHelp("", "", "directory");
+	PrintHelp("-o", "--rmold", "Delete N old podcasts where N is 4 or the number");
+	PrintHelp("", "", "supplied to --files");
+	PrintHelp("-i", "--ignore-pattern", "Ignore filenames matching the regexp pattern");
+	PrintHelp("", "", "supplied when downloading, copying or deleting podcasts");
+	PrintHelp("","--clean","Clean up the podcasts directory and catalogue.");
+}
+
+# Purpose: Print version and warranty information
+# Usage: Version();
+sub Version { print "GoldenPod $Version\n by Eskild Hustvedt\nGoldenPod comes with ABSOLUTELY NO WARRANTY!\n"; };
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Helper functions
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: print() something if we're verbose
+# Usage: printv(OPTS);
+#  OPTS are identical to print();
+sub printv {
+	if($Verbose) {
+		print(@_);
+	}
+}
+
+# Purpose: Prepare logging (if needed)
+# Usage: PrepareLogging();
+sub PrepareLogging {
+	# Unless we're verbose, write stuff to $ProgramLog
+	open(STDOUT, ">>",$ProgramLog) unless $NoLog;
+	open(STDERR, ">>",$ProgramLog) unless $NoLog;
+
+	# If we're in logging mode then log the date and time started
+	print "Started at " . localtime(time) unless $NoLog;
+	# If we're not verbose and $NoLog is 2 (-l) then write stuff to /dev/null ;)
+	open(STDOUT, ">", "/dev/null") if $NoLog and $NoLog == 2;
+	open(STDERR, ">", "/dev/null") if $NoLog and $NoLog == 2;
+}
+
+# Purpose: Check for a file in path
+# Usage: InPath(FILE)
+sub InPath {
+	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and ! -d "$_/@_" ) {	return true; } } return false;
+}
+
+# Purpose: Check if a directory is empty
+# Usage: DirIsEmpty(PATH);
+#  Returns 1 if it is empty, 0 if it isn't.
+sub DirIsEmpty {
+        opendir(TESTDIR, $_[0]);
+        my @TestDir = readdir(TESTDIR);
+        closedir(TESTDIR);
+        unless (scalar @TestDir > 2) {
+                return true;
+        }
+        return false;
+}
+
+# Purpose: Clear the screen if possible
+# Usage: Clear();
+sub Clear {
+	# Don't call it if we're not in verbose mode
+	return(0) if(not $Verbose);
+	if (InPath("clear")) {
+		system("clear");
+	}
+}
+
+# Purpose: Download a URL
+# Usage: DownloadURL(ToDir, URL);
+#  Also handles creating the ToDir
+sub DownloadURL {
+	my ($ToDir, $URL) = @_;
+	my $CWD = getcwd();
+	if(not -d $ToDir) {
+		mkdir($ToDir) or die("Unable to mkdir $ToDir: $!\n");
+	}
+	chdir($ToDir);
+	my $DownloadStatus = system("curl", @CurlGlobal, @CurlVerbosity, "-O", $URL);
+	chdir($CWD);
+	$DownloadStatus = $DownloadStatus >> 8;
+	return($DownloadStatus);
+}
+
+# Purpose: Prepend a "0" to a number if it is only one digit.
+# Usage: my $NewNumber = PrependZero(NUMBER);
+sub PrependZero {
+	if ($_[0] =~ /^\d$/) {
+		return("0$_[0]");
+	}
+	return($_[0]);
+}
+
+# Purpose: Get OS/distro version information
+# Usage: print "OS: ",GetDistVer(),"\n";
+sub GetDistVer {
+	# GNU/Linux and BSD
+	foreach(qw/mandriva mandrakelinux mandrake fedora redhat red-hat ubuntu lsb debian gentoo suse distro dist slackware freebsd openbsd netbsd dragonflybsd NULL/) {
+		if (-e "/etc/$_-release" or -e "/etc/$_-version" or -e "/etc/${_}_version" or $_ eq "NULL") {
+			my ($DistVer, $File, $VERSION_FILE);
+			if(-e "/etc/$_-release") {
+				$File = "$_-release";
+				open($VERSION_FILE, "<", "/etc/$_-release");
+				$DistVer = <$VERSION_FILE>;
+			} elsif (-e "/etc/$_-version") {
+				$File = "$_-version";
+				open($VERSION_FILE, "<", "/etc/$_-release");
+				$DistVer = <$VERSION_FILE>;
+			} elsif (-e "/etc/${_}_version") {
+				$File = "${_}_version";
+				open($VERSION_FILE, "<", "/etc/${_}_version");
+				$DistVer = <$VERSION_FILE>;
+			} elsif ($_ eq "NULL") {
+				last unless -e "/etc/version";
+				$File = 'version';
+				open($VERSION_FILE, "<", "/etc/version");
+				$DistVer = <$VERSION_FILE>;
+			}
+			close($VERSION_FILE);
+			chomp($DistVer);
+			return("/etc/$File: $DistVer");
+		}
+	}
+	# Didn't find anything yet. Get uname info
+	my ($sysname, $nodename, $release, $version, $machine) = POSIX::uname();
+	if ($sysname =~ /darwin/i) {
+		my $DarwinName;
+		my $DarwinOSVer;
+		# Darwin kernel, try to get OS X info.
+		if(InPath("sw_vers")) {
+			if(open(my $SW_VERS, "sw_vers |")) {
+				while(<$SW_VERS>) {
+					chomp;
+					if (s/^ProductName:\s+//gi) {
+						$DarwinName = $_;
+					} elsif(s/^ProductVersion:\s+//) {
+						$DarwinOSVer = $_;
+					}
+				}
+				close($SW_VERS);
+			}
+		}
+		if(defined($DarwinOSVer) and defined($DarwinName)) {
+			return("$DarwinName $DarwinOSVer ($machine)");
+		}
+	}
+	return("Unknown ($sysname $release $version $machine)");
+}
+
+# Purpose: Display useful information
+# Usage: DumpInfo();
+sub DumpInfo {
+	Version();
+	print "\nI would read the configuration file $UserConfigDir/goldenpod.conf\n";
+	print "I would read podcasts from $Config\n";
+	print "I would log the program messages to $ProgramLog\n" unless $Verbose or $NoLog;
+	print "I would log the downloaded podcasts to $PodcastLog\n";
+	print "I would write to $Config{WorkingDir}\n";
+	if($_[0]) {
+		printf "Perl version %vd\n", $^V;
+		print "OS: ", GetDistVer(), "\n";
+	}
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# NoDownload routine
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: Adds all items in %NoDownload to the logfile
+# Usage: PerformNoDownload();
+sub PerformNoDownload {
+	printv("\nWriting older podcasts to the logfile...") if not $FirstOnly;
+	open(my $LOGFILE, ">>",$PodcastLog);
+	foreach (keys (%NoDownload)) {
+		print $LOGFILE "$_\n" unless $AlreadyDownloaded{$_};
+	}
+	printv(" done\n") if not $FirstOnly;
+	close($LOGFILE);
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Helper routines for --copy and --rmold
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: Returns the value supplied to --files or 4
+# Usage: HowManyFiles();
+sub HowManyFiles {
+	my $FileCount = $FileNumber ? $FileNumber : 4;
+	# Unless it's an integer we can't continue
+	if ($FileCount =~ /\D/) {
+		die "Error: The option passed to --files ($FileCount) is not an integer number.\n";
+	}
+	return $FileCount;
+}
+
+# Purpose: Finds and sorts files in the current directory by time (newest first)
+#  and returns an array containing them.
+# Usage: my @List = SortedFileList();
+# NOTE: Ignores files that aren't symlinks.
+sub SortedFileList {
+	my $FromDir = shift;
+	my (@SortedFileList, %FileCopyList);
+	
+	# For compatibility with older GoldenPods
+	my $CWD = getcwd();
+	chdir($FromDir);
+        # Create a hash of possible filenames
+        foreach my $FileName (glob("$FromDir/*")) {
+		# Is it a link? If it isn't then we don't bother testing it
+		next unless -l $FileName;
+                # If the link points to something that doesn't exist them we omit it.
+                if (-e (readlink $FileName)) {
+			# We don't care about directories
+			unless (-d $FileName) {
+	                        $FileCopyList{Cwd::realpath(readlink($FileName))} = 1;
+			}
+                }
+        }
+        # Create a sorted array of filenames
+        # map { [ $_, -M $_||0 ] } keys(%FileCopyList); = that means make a two dimensional array so that $_->[0]="filename.txt" and $_->[1] is the -M value
+        # sort { $a->[1] <=> $b->[1] } = sort the array we just thought of by the $_->[1] index, ie the -M times
+        # map { $_->[0] } take the sorted array and convert it back to a plain list of filenames by reading out the $_->[0] values.  These are now in the right order as they are sorted
+        @SortedFileList = map { $_->[0] } sort { $a->[1] <=> $b->[1] } map { [ $_, -M $_ ] } keys(%FileCopyList);
+	chdir($CWD);
+	return @SortedFileList;
+}
+
+# Purpose: Clean up the catalogue.
+# Usage: CleanCatalogue();
+sub CleanCatalogue {
+	my $CatalogueBase = shift;
+	die("Catalogue didn't exist. Maybe you haven't downloaded anything yet?\n") if not -e $CatalogueBase;
+	# For compatibility with older GoldenPods
+	my $CWD = getcwd();
+	chdir($CatalogueBase);
+	print "Cleaning up the catalogue...";
+	foreach my $CurrentDirectory (glob("$CatalogueBase/*")) {
+		chdir($CurrentDirectory);
+		foreach my $CurrentFile (glob("$CurrentDirectory/*")) {
+			next unless -l $CurrentFile;
+			unless (-e readlink($CurrentFile)) {
+				unlink($CurrentFile);
+			}
+		}
+		chdir("..");
+	}
+	chdir($CWD);
+	print "done\n";
+}
+
+# Purpose: Remove empty directories in ./
+# Usage: RemoveEmptyDirs();
+sub RemoveEmptyDirs {
+	my $FromDirectory = shift;
+	foreach my $Directory (glob("$FromDirectory/*")) {
+		next unless -d $Directory;
+		rmdir($Directory) if DirIsEmpty($Directory);
+	}
+}
+
+# Purpose: Rewrite all playlists
+# Usage: RewritePlaylists(Base CatalogueDir);
+#  Call this before you delete directories to remove old playlists that are no
+#  longer used.
+sub RewritePlaylists {
+	my $CatalogueBase = shift;
+	print "Rewriting playlists...";
+	my $CWD = getcwd();
+	foreach (glob("$CatalogueBase/*")) {
+		next unless -d $_;
+		# Skip the All directory
+		# FIXME: Don't blindly assume there are no other dirs ending in All
+		next if $_ =~ /All$/;
+		# This variable will be 1 if we wrote something to the playlist
+		my $WrotePlaylistContent = 0;
+		# The dirname, as used in the playlist filenames
+		my $DirName = basename($_);
+		# Remove the old playlist if it exists
+		unlink("$_/$DirName.m3u") if -e "$_/$DirName.m3u";
+		# Skip directory if it's empty
+		if(DirIsEmpty($_)) {
+			next;
+		}
+		# Open our new playlist
+		open(my $PLAYLIST, ">", "$_/$DirName.m3u");
+		chdir($_);
+		# Create the playlist based upon the output of SortedFileList
+		foreach my $CurrentFile (SortedFileList($_)) {
+			# Skip playlists
+			next if $CurrentFile =~ /\.m3u$/;
+			# Add to the playlist
+			print $PLAYLIST basename($CurrentFile),"\n";
+			$WrotePlaylistContent = 1;
+		}
+		close($PLAYLIST);
+		unlink("$_/$DirName.m3u") unless $WrotePlaylistContent;
+		chdir($CWD);
+	}
+	print "done\n";
+}
+
+# Purpose: Clean up our directories
+# Usage: CleanupDirs();
+sub CleanupDirs {
+	# Flush the output buffer faster.
+	$| = 1;
+	# Set the path to the Catalogue
+	my $CatalogueDirectory = "$Config{WorkingDir}/catalogue/";
+	# Remove dead links in the catalogue
+	CleanCatalogue($CatalogueDirectory);
+	# Rewrite the playlists, removing the dead files
+	RewritePlaylists($CatalogueDirectory);
+	# Remove empty directories
+	print "Removing empty directories...";
+	RemoveEmptyDirs($CatalogueDirectory);
+	RemoveEmptyDirs($Config{WorkingDir});
+	print "done\n";
+	if(-e ("$Config{WorkingDir}/latest") and not readlink("$Config{WorkingDir}/latest")) {
+		unlink("$Config{WorkingDir}/latest");
+	}
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Subroutines for --copy and --rmold
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: Delete old podcasts
+# Usage: DeleteOldPodcasts();
+sub DeleteOldPodcasts {
+	my $CatalogueDirectory = "$Config{WorkingDir}/catalogue/";
+	# Declare variables
+	my (@FileList, %Files, @RemoveTheseFiles);
+	my $NumberOfFiles = HowManyFiles();
+	# Make sure the all All directory exists
+	die("The $CatalogueDirectory/All directory did not exist!\nAre you sure you have downloaded some podcasts?\n") unless -d "$CatalogueDirectory/All";
+	# Figure out which files are the oldest podcasts
+	@FileList = reverse SortedFileList("$CatalogueDirectory/All");
+	my $PodcastCount = @FileList;
+	# We don't allow the user to delete the last remaining podcast.
+	die("Only one podcast has been downloaded. If you really want to delete it you must do so manually\n") if $PodcastCount == 1;
+	# Make sure we don't delete more than the total amount of podcasts minus one
+	if ($NumberOfFiles >= $PodcastCount) {
+		my $ErrorNo = $NumberOfFiles;
+		while($NumberOfFiles >= $PodcastCount) {
+			$NumberOfFiles--;
+		}
+		warn "$ErrorNo is higher than the total amount of podcasts ($PodcastCount). Using $NumberOfFiles instead\n";
+	}
+	# Delete the files
+	my $DeletedFiles = 0;
+	while ($NumberOfFiles > $DeletedFiles) {
+		my $TargetBase = basename($FileList[0]);
+		unless ($IgnorePattern and $TargetBase =~ /$IgnorePattern/) {
+			# If we're in dry run mode then we don't want to actually do anything.
+			if ($DryRun_Mode) {
+				print "Would delete $TargetBase\n";
+			} else {
+				print "Deleting $TargetBase...";
+				if(unlink($FileList[0])) {
+					print "done\n";
+				} else {
+					print "failed: $!\n";
+				}
+			}
+			$DeletedFiles++;
+		}
+		shift @FileList;
+		last unless $FileList[0];
+	}
+	# Stop here if we're in dry run mode
+	exit if $DryRun_Mode;
+	CleanupDirs();
+	exit
+}
+
+# Purpose: Copy files to $CopyFilesTo
+# Usage: CopyFiles();
+sub CopyFiles {
+	# Declare variables
+	my (@FileList, %Files, @CopyTheseFiles, %DontDeleteThese);
+	my $NumberOfFiles = HowManyFiles();
+	# Do a few directory checks before moving on.
+	die "The ./catalogue/All/ directory did not exist!\nAre you sure you have downloaded some podcasts?\n" unless -e "./catalogue/All/";
+	die "$CopyFilesTo does not exist!\n" 			unless -e $CopyFilesTo;
+	die "$CopyFilesTo is not a directory!\n"		unless -d $CopyFilesTo;
+	die "I can't write to the directory $CopyFilesTo!\n"	unless -w $CopyFilesTo;
+	
+	# Figure out which files are the latest podcasts
+	# A sorted array of files
+	@FileList = SortedFileList("$Config{WorkingDir}/catalogue/All/");
+	# Create an array of the files we should copy
+	my $CopiedFiles = 0;
+	while (defined($FileList[$CopiedFiles]) and $CopiedFiles < $NumberOfFiles) {
+		my $TargetBase = basename($FileList[$CopiedFiles]);
+		# Check if we want to skip files matching a specific regexp
+		unless ($IgnorePattern and $TargetBase =~ /$IgnorePattern/) {
+			push(@CopyTheseFiles, $FileList[$CopiedFiles]);
+			$DontDeleteThese{$TargetBase} = 1;
+			$CopiedFiles++;
+		} else {
+			shift(@FileList);
+		}
+	}
+	# Delete routine (delete files unless we would have copied it)
+	if ($CopyFiles_Delete) {
+		# Time to delete files in the target directory
+		
+		# Babysitting the user :)
+		if($CopyFilesTo =~ m#^($ENV{HOME}(/|/Documents/?.*)|/(usr|var|dev|etc|lib|sbin|sys|boot|proc)/?.*)$#) {
+			die "Not allowed to delete in the directory \"$CopyFilesTo\"\n";
+		}
+		# Delete the files
+		while ($_ = glob("$CopyFilesTo/*")) {
+			my $TargetBase = basename($_);
+			# This one is merely cosmetic
+			$_ =~ s#//#/#g;
+			# If it is in the $DontDeleteThis hash or is a directory we skip it.
+			next if $DontDeleteThese{$TargetBase} or -d $_;
+			# If we're in dry run mode we don't want to actually do anything
+			if ($DryRun_Mode) {
+				print "Would delete $_\n";
+			} else {
+				print "Deleting $_\n";
+				unlink("$_") or warn "Deleting of $_ failed: $!\n";
+			}
+		}
+	}
+	# Copy the files
+	foreach (@CopyTheseFiles) {
+		my $TargetBase = basename($_);
+		printv("Skipping pre-existing \"$TargetBase\"\n") if -e "$CopyFilesTo/$TargetBase";
+		next if -e "$CopyFilesTo/$TargetBase";
+		# If we're in dry run mode we don't want to actually do anything
+		if ($DryRun_Mode) {
+			print "Would copy $TargetBase\n";
+		} else {
+			print "Copying $TargetBase...\n";
+			copy("$_", "$CopyFilesTo") or die "Copying failed: $!\n";
+		}
+	}
+	# And finally, attempt to run sync once.
+	if (InPath "sync" and not $DryRun_Mode) {
+		printv("Synchronizing disks...");
+		system("sync");
+	}
+	printv("All done\n");
+	exit
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Configuration file functions
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: Write a configuration file
+# Usage: WriteConfigFile(/FILE, \%ConfigHash, \%ExplanationHash);
+sub WriteConfigFile {
+	my ($File, $Config, $Explanations) = @_;
+
+	# Open the config for writing
+	open(my $CONFIG, ">", "$File") or do {
+		# If we can't then we error out, no need for failsafe stuff - it's just the config file
+		warn("Unable to save the configuration file $File: $!");
+		return(0);
+	};
+	if(defined($Explanations->{HEADER})) {
+		print $CONFIG "# $Explanations->{HEADER}\n";
+	}
+	foreach(sort(keys(%{$Config}))) {
+		if(defined($Explanations->{$_})) {
+			print $CONFIG "\n# $Explanations->{$_}";
+		} else {
+			next unless length($Config->{$_}) # Don't write empty options not in %Explanations
+		}
+		print $CONFIG "\n$_=$Config->{$_}\n";
+	}
+	close($CONFIG);
+}
+
+# Purpose: Load a configuration file
+# Usage: LoadConfigFile(/FILE, \%ConfigHash, \%OptionRegexHash, OnlyValidOptions?);
+#  OptionRegeXhash can be available for only a select few of the config options
+#  or skipped completely (by replacing it by undef).
+#  If OnlyValidOptions is true it will cause LoadConfigFile to skip options not in
+#  the OptionRegexHash.
+sub LoadConfigFile {
+	my ($File, $ConfigHash, $OptionRegex, $OnlyValidOptions) = @_;
+
+	open(my $CONFIG, "<", "$File") or do {
+		printf("Unable to read the configuration settings from %s: %s", $File, $!);
+		return(0);
+	};
+	while(<$CONFIG>) {
+		next if m/^\s*(#.*)?$/;
+		next unless m/=/;
+		chomp;
+		my $Option = $_;
+		my $Value = $_;
+		$Option =~ s/^\s*(.*)\s*=.*/$1/;
+		$Value =~ s/^.*=\s*(.*)\s*/$1/;
+		if($OnlyValidOptions) {
+			unless(defined($OptionRegex->{$Option})) {
+				warn("Unknown configuration option \"$Option\" in $File: Ignored.\n");
+				next;
+			}
+		}
+		unless(defined($Value)) {
+			warn("Empty value for option $Option in $File\n");
+		}
+		if(defined($OptionRegex) and defined($OptionRegex->{$Option})) {
+			my $MustMatch = $OptionRegex->{$Option};
+			unless ($Value =~ /$MustMatch/) {
+				print "Invalid setting of $Option in the config file: Must match $OptionRegex->{Option}.\n";
+				next;
+			}
+		}
+		$ConfigHash->{$Option} = $Value;
+	}
+	close($CONFIG);
+}
+
+# Purpose: Load the global config file from $UserConfigDir
+# Usage: InitGlobalConfig();
+sub InitGlobalConfig {
+	# Create the directory if it isn't already there
+	unless(-e $UserConfigDir) {
+		InitConfigDir();
+	}
+	my %OptionRegexHash = (
+			# Old-style (pre 0.7) settings
+			'$WorkingDir ' => '.',
+			'$DefaultVerbosity ' => '.',
+			'$IgnorePattern ' => '.',
+			'$PodcastFilter ' => '.',
+
+			# New-style 0.7+
+			# TODO: At some point accept true/TRUE/false/FALSE/yes/YES/no/NO/1/0 instead of just 1/0
+			WorkingDir => '.',
+			DefaultVerbosity => '0|1',
+			PodcastFilter => '0|1',
+		);
+
+	LoadConfigFile("$UserConfigDir/goldenpod.conf", \%Config, \%OptionRegexHash);
+	if(defined($Config{'$WorkingDir '})) {
+		print "Migrating old configuration format...";
+		foreach (qw#$WorkingDir $DefaultVerbosity $IgnorePattern $PodcastFilter#) {
+			my $OptName = $_;
+			print ".";
+			$OptName = "$OptName ";
+			my $Opt = $Config{$OptName};
+			$Opt =~ s/^\"(.*)\";?$/$1/;
+			delete($Config{$OptName});
+			$OptName =~ s/^\$(\w+)\s*/$1/;
+			$Config{$OptName} = $Opt;
+		}
+		print ".";
+		WriteGPConfig();
+		print "done\n";
+	}
+	return(1);
+}
+
+# Purpose: Write the configuration file
+# Usage: WriteConfig();
+sub WriteGPConfig {
+	# Verify the options first
+	unless(defined($Config{WorkingDir}) and length($Config{WorkingDir})) {
+		$Config{WorkingDir} = "$ENV{HOME}/Podcasts";
+	}
+	if(not defined($Config{DefaultVerbosity}) or not length($Config{DefaultVerbosity})) {
+		$Config{DefaultVerbosity} = 1;
+	}
+	if(not defined($Config{PodcastFilter}) or not length($Config{PodcastFilter})) {
+		$Config{PodcastFilter} = 0;
+	}
+	my %Explanations = (
+		WorkingDir => "The directory the podcasts will be downloaded to.\n# This is only used if ./podcasts.conf and ./bp.conf doesn't exist.\n# If one of those exists then WorkingDir will become ./",
+		DefaultVerbosity => "How verbose GoldenPod should be by default (commandline arguments overrides this)\n# 1 means be verbose (default), 0 means be silent",
+		IgnorePattern => "A regular expression pattern that GoldenPod should ignore when downloading or copying\n# podcasts. It will be applied to the filename. See the manpage for more information about it.\n# --ignore-pattern overrides this setting, and --rmold only obeys --ignore-pattern, not this configuration setting.",
+		PodcastFilter => "If GoldenPod should ignore non-audio files in the feeds\n# 0 means don't ignore (default), 1 means ignore.",
+		HEADER => "GoldenPod configuration file\n# DO NOT put feed URLs in this file. Those go in podcasts.conf",
+	);
+	# Write the actual file
+	WriteConfigFile("$UserConfigDir/goldenpod.conf", \%Config, \%Explanations);
+}
+
+# Purpose: Creates ~/.goldenpod or another $UserConfigDir
+# Usage: InitConfigDir();
+sub InitConfigDir {
+	mkdir $UserConfigDir or die "Unable to create the directory $UserConfigDir: $!" unless -e $UserConfigDir;
+	# If /etc/goldenpod-podcasts.conf exists the copy that to ~/.goldenpod/podcasts.conf
+	if ( -e "/etc/goldenpod-podcasts.conf" ) {
+		warn "Copying /etc/goldenpod-podcasts.conf to $UserConfigDir/podcasts.conf";
+		copy("/etc/goldenpod-podcasts.conf", "$UserConfigDir/podcasts.conf") or warn "Copying of /etc/goldenpod-podcasts.conf failed: $!";
+	}
+	# If we don't have ~/.goldenpod/podcasts.conf (no /etc/goldenpod.conf or failure copying it)
+	# then write an empty one.
+	unless ( -e "$UserConfigDir/podcasts.conf" ) {
+		open(my $PODCASTS_CONF, ">","$UserConfigDir/podcasts.conf");
+		print $PODCASTS_CONF "# Put your podcast feed URLs in this file seperated by newlines\n# All lines starting with # are ignored";
+		close($PODCASTS_CONF);
+	}
+	WriteGPConfig();
+}
+
+# Purpose: Detect which mode we are running in
+# Usage: ModeDetection();
+sub ModeDetection {
+	my ($Mode, $LocalDir);
+	# First check if we can use files in ./
+	if (-e "./bp.conf" or -e "./podcasts.conf") {
+		$Mode = "local";
+		$LocalDir = Cwd::getcwd;
+	}
+
+	# If we can't use files in ./ let's check something else
+	unless ($Mode) {
+		# Check for files in the directory containing the goldenpod executeable (if that dir is -w)
+		my $BaseDirectory = dirname($0);
+		if (-w $BaseDirectory and (-e "$BaseDirectory/bp.conf" or -e "$BaseDirectory/podcasts.conf")) {
+			$Mode = "local";
+			$LocalDir = "$BaseDirectory";
+		}
+	} else {
+		# If we're in local mode because PWD is ~/.goldenpod then work in global
+		# mode instead.
+		$Mode = "global" if $LocalDir eq "$ENV{HOME}/.goldenpod";
+	}
+	# If all else fails (not that it's a bad thing really) we use ~/.goldenpod
+	if(not $Mode) {
+		$Mode = "global";
+	}
+	# Initialize config
+	$UserConfigDir = "$ENV{HOME}/.goldenpod";
+	InitGlobalConfig();
+
+	# If we're working in local mode, set some specific settings.
+	if ($Mode eq "local") {
+		$ConfigDir = $LocalDir;
+		$Config{WorkingDir} = $LocalDir;
+	} else {
+		$ConfigDir = $UserConfigDir;
+	}
+
+	# Do base initialization
+	$ProgramLog = "$ConfigDir/goldenpod.log";	# When we are silent we log to this file
+	# Use podcasts.log if it exists, use podcast.log if podcasts.log doesn't exist
+	# but podcast.log doesn't, use podcasts.log if neither exists.
+	# (yes this is annoying, note that it is podcast and podcastS)
+	if (-e "$ConfigDir/podcasts.log" or !-e "$ConfigDir/podcast.log") {
+		$PodcastLog = "$ConfigDir/podcasts.log";
+	} else {
+		$PodcastLog = "$ConfigDir/podcast.log";
+	}
+	# Detect config file.
+	if (-e "$ConfigDir/podcasts.conf" or !-e "$ConfigDir/bp.conf") {
+		$Config = "$ConfigDir/podcasts.conf";
+	} else {
+		$Config = "$ConfigDir/bp.conf"
+	}
+	# Be verbose by default if the user wants to
+	Arg_Verbose() if $Config{DefaultVerbosity};
+	# Create WorkingDir if it doesn't exist
+	mkdir $Config{WorkingDir} unless -e $Config{WorkingDir};
+	# Require +w on WorkingDir
+	die "I cannot write to $Config{WorkingDir}!\n" unless -w $Config{WorkingDir};
+	# Get the realpath to WorkingDir in case it is relative
+	$Config{WorkingDir} = realpath($Config{WorkingDir}) or die("Unable to fix the path of $Config{WorkingDir}\n");
+}
+
+# Purpose: Make us verbose
+# Usage: Arg_Verbose();
+sub Arg_Verbose { 
+	$Verbose = "1";
+	$NoLog = "1" unless $NoLog;
+	@CurlVerbosity = "-#";
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Download and feed functions
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: Parse a feed
+# Usage: my($URLs,$Title) = ParseFeed(FEED_CONTENTS);
+#  $Title can be undef. $URLs is an arrayref, can be empty.
+sub ParseFeed {
+	my $FeedContents = shift;
+	my @URLs;
+	# Drop useless junk from the feed contents
+	$FeedContents =~ s/\r?\n?//g;
+	
+	# Try to find the title of the podcast
+	my $FeedTitle = $FeedContents;
+	if ($FeedTitle =~ /<title>([^<]*)<\/title>.*$/) {
+		$FeedTitle = $1;	#FIXME
+		# Run it through a filter
+		$FeedTitle =~ s/<.+?>//g;
+		$FeedTitle =~ s/\s+/_/g;
+		$FeedTitle =~ s#(/|\#|\(|\)|\&|\%|\¤|\"|\|)#_#g;
+		$FeedTitle =~ s/[\-\_]+(episodes?|promo|mp3|ogg|feed)*$//gi; # Remove various junk
+		$FeedTitle =~ s/[\-\_]?$//; # Remove -_ in the end of the name
+		# Remove more than one - or _ in a row
+		$FeedTitle =~ s/-+/-/g;
+		$FeedTitle =~ s/_+/_/g;
+	} else {
+		$FeedTitle = "";
+	}
+	# Do the real parsing and add to @urls
+	# We want to extract all url='s
+	while(((my $CurrUrl = $FeedContents) =~ s/^.*url\s*=\s*[\"\']([^\"\']+)[\"\'].*$/$1/))
+	{
+		$FeedContents =~ s/url\s*=\s*[\"\'](\Q$CurrUrl\E)[\"\']//;
+		# Filter away non-audio feeds if the user wants it.
+		if ($Config{PodcastFilter}) {
+			next unless basename($CurrUrl) =~ /.*\.(ogg|mp3|m4a|wave?|flac|wmv|ape|tta|aac|mp2|mpa|ra|ram|aif|au|mpu).*/i;
+		}
+		# Filter away stuff in $IgnorePattern
+		if ($IgnorePattern) {
+			next if basename($CurrUrl) =~ /$IgnorePattern/;
+		}
+		# Add the title string to the PodNames array (if we have found the title)
+		$PodNames{$CurrUrl} = $FeedTitle;
+		push(@URLs, $CurrUrl);
+	}
+	# The current @URLs has the oldest first. Reverse it before returning it.
+	@URLs = reverse(@URLs);
+	return(\@URLs, $FeedTitle);
+}
+
+# Purpose: Download podcasts contained in the supplied array reference
+# Usage: DownloadPodcasts(ARRAYREF);
+sub DownloadPodcasts {
+	my $DownloadThese = shift;
+	my $NeedToDownload = scalar(@{$DownloadThese});
+	my @DownloadedFiles;
+	Clear();
+	# Output the amount of files we need to download
+	print "$NeedToDownload new podcasts.\n\n" if $NeedToDownload > 1;
+	print "$NeedToDownload new podcast.\n\n" if $NeedToDownload == 1;
+	# Open the logfile for writing
+	open(my $LOGFILE, ">>",$PodcastLog);
+	
+	# Download the podcasts
+	foreach (@{$DownloadThese}) {
+		unless ($DryRun_Mode) {
+			print "Downloading $_\n";
+			# Curl returns nonzero on failure
+			my $DownloadStatus = DownloadURL("$Config{WorkingDir}/$date", $_);
+			if($DownloadStatus) {
+				warn "Download of $_ failed! Curl exited with return value $DownloadStatus\n";
+				next;
+			} else {
+				push(@DownloadedFiles, $_);
+			}
+			print $LOGFILE "$_\n";
+			# If we're in --first-only we add it to $AlreadyDownloaded{$_} so that NoDownload doesn't add it
+			if ($FirstOnly) {
+				$AlreadyDownloaded{$_} = 1 if $DownloadStatus;
+			}
+		} else {
+			print "Would download $_\n";
+		}
+	}
+	close($LOGFILE);
+	return(\@DownloadedFiles);
+}
+
+# Purpose: Create the catalogue entries for the current date
+# Usage: CreateCatalogue();
+sub CreateCatalogue {
+	my $Downloaded = shift;
+	# Filename filter
+	# Remove junk after .EXTension and convert %20 to _
+	foreach (glob("$Config{WorkingDir}/$date/*")) {
+		my $OldName = basename($_);
+		my $NewName = basename($_);
+		$NewName =~ s/\?.*//g;
+		$NewName =~ s/(%20|\s+)/_/g;
+		if(not $NewName eq $OldName) {
+			rename("$OldName", "$NewName");
+		}
+	}
+	# Make the ./latest symlink point to $date
+	unlink "$Config{WorkingDir}/latest" if -l "$Config{WorkingDir}/latest";
+	symlink "$Config{WorkingDir}/$date", "$Config{WorkingDir}/latest";
+
+	# Create our catalogue (podcasts sorted in named directories)
+	mkdir "$Config{WorkingDir}/catalogue" unless -e "$Config{WorkingDir}/catalogue";
+	mkdir "$Config{WorkingDir}/catalogue/All/" unless -e "$Config{WorkingDir}/catalogue/All/";
+	# For every file, make sure it has a catalogue entry.
+	foreach my $OrigName (@$Downloaded) {
+		# We don't want to do anything to playlists
+		next if ($OrigName =~ /\.m3u$/);
+		
+		my $BaseName = basename($OrigName);
+		my ($Existed, $PodBaseName);
+		# Get the base name of the podcast
+		if ($PodNames{$OrigName}) {
+			$PodBaseName = $PodNames{$OrigName};
+		} else {
+			$PodBaseName = $BaseName;
+			# If we couldn't get the podcast name from the feed then try even
+			# harder here.
+			$PodBaseName =~ s/\d+//g;			# Remove digits
+			$PodBaseName =~ s/[\-\_]+(show|promo)*$//gi;	# Remove various junk
+			$PodBaseName =~ s/__+/_/g;			# Do some additional cleaning
+			$PodBaseName =~ s/[\-\_].$//;			# Remove -_ in the end of the name
+			$PodBaseName = "\u$PodBaseName";		# Make the first character be uppercase
+			$PodBaseName = "Unknown" unless $PodBaseName;	# Bah :(
+		}
+		mkdir "$Config{WorkingDir}/catalogue/$PodBaseName" unless -d "$Config{WorkingDir}/catalogue/$PodBaseName";
+		# We don't want to do anything if it already exists
+		unless (-e "$Config{WorkingDir}/catalogue/$PodBaseName/$BaseName") {
+			# Try to get the extension
+			my $NameExtension = $BaseName;
+			$NameExtension =~ s/.*(\.\w)/$1/;
+			# Symlink the files and write the playlist
+			symlink "$Config{WorkingDir}/$date/$BaseName", "$Config{WorkingDir}/catalogue/$PodBaseName/$BaseName";
+			unlink "$Config{WorkingDir}/catalogue/$PodBaseName/latest$NameExtension" if -e "$Config{WorkingDir}/catalogue/$PodBaseName/latest$NameExtension";
+			symlink "$Config{WorkingDir}/$date/$BaseName", "$Config{WorkingDir}/catalogue/$PodBaseName/latest$NameExtension";
+			open(my $PLAYLIST, ">>","$Config{WorkingDir}/catalogue/$PodBaseName/$PodBaseName.m3u");
+			print $PLAYLIST "$BaseName\n";
+			close($PLAYLIST);
+		}
+		# Add it to All too if needed
+		unless (-e "$Config{WorkingDir}/catalogue/All/$BaseName") {
+			symlink "$Config{WorkingDir}/$date/$BaseName", "$Config{WorkingDir}/catalogue/All/$BaseName";
+		}
+	}
+}
+
+# Purpose: Fetch and parse the feeds
+# Usage: FetchFeeds();
+sub FetchFeeds {
+	# Is the config file empty?
+	my $ConfIsNotEmpty = 0;
+	# The list of podcasts to download
+	my @DownloadQueue;
+	# The list of podcasts available
+	my @PodcastsAvailable;
+	# The list of podcasts to download in first-only mode
+	my @FirstOnly;
+	# Open the configuration file
+	open(my $CONFIG, "<", $Config);
+
+	# Read the configuration file and fetch feeds
+	while(my $podcast = <$CONFIG>) {
+		chomp $podcast;
+		# Ignore empty lines and lines starting with #
+		next if $podcast =~ /^\s*(#.*)?$/;
+		printv("Fetching $podcast\n");
+		$ConfIsNotEmpty = 1;	# The config isn't empty! Yay!
+		# Open curl for reading
+		my ($Child_IN, $Child_OUT, $Output);
+		my $PID = open2($Child_OUT, $Child_IN, "curl",@CurlGlobal,@CurlVerbosity,$podcast) or die("Unable to open3(): $!\n");
+		# Read from curl
+		while(<$Child_OUT>) {
+			$Output .= $_;
+		}
+		# Parse the feed and get the URLs
+		my ($URLs, $Title) = ParseFeed($Output);
+		# If URLs is empty just jump to the next feed
+		next if(scalar(@{$URLs}) == 0);
+		# Push those URLs not already downloaded into @PodcastsAvailable
+		foreach my $url (@{$URLs}) {
+			if(not $AlreadyDownloaded{$url}) {
+				push(@PodcastsAvailable, $url);
+			}
+		}
+		push(@FirstOnly, ${$URLs}[0]);
+	}
+
+	# If the config is empty, die.	
+	die "The podcast list in $Config is empty!\n" unless $ConfIsNotEmpty;
+
+	# Close the configuration file
+	close $CONFIG;
+	
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+	# Find out if we need to download anything
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+	
+	# Create the %AlreadyDownloaded hash.
+	if ( -e $PodcastLog) {
+		# Open the logfile containing previously downloaded files
+		open(my $LOGFILE, "<", $PodcastLog);
+		# Add them to a hash
+		%AlreadyDownloaded = map { chomp; $_=>1 } <$LOGFILE>;
+		# Close the logfile
+		close $LOGFILE;
+		# Remove those we already have
+		if($FirstOnly) {
+			foreach my $URL(@FirstOnly) {
+				if(not $AlreadyDownloaded{$URL}) {
+					push(@DownloadQueue, $URL);
+				}
+			}
+		} else {
+			foreach my $URL (@PodcastsAvailable) {
+				if(not $AlreadyDownloaded{$URL}) {
+					push(@DownloadQueue, $URL);
+				}
+			}
+		}
+	} else {
+		if($FirstOnly) {
+			@DownloadQueue = @FirstOnly;
+		} else {
+			@DownloadQueue = @PodcastsAvailable;
+		}
+	}
+
+	if($NoDownload or $FirstOnly) {
+		# We're in nodownload mode so we need to copy the contents of the URLs array
+		# to the NoDownload hash
+		%NoDownload = map { $_ => 1 } @PodcastsAvailable;
+		if($NoDownload) {
+			PerformNoDownload();
+			exit(0);
+		}
+	}
+	return(\@DownloadQueue);
+}
+
+# Purpose: Perform the main functions
+# Usage: PerformMain();
+sub PerformMain {
+	# First prepare logging.
+	PrepareLogging();
+	# Then fetch and parse our feeds.
+	my $DownloadQueue = FetchFeeds();
+	if(scalar(@{$DownloadQueue}) == 0) {
+		print "Nothing to download\n" unless $Verbose;
+		exit(0);
+	}
+	# Then download the podcasts
+	my $Downloaded = DownloadPodcasts($DownloadQueue);
+	if(scalar(@$Downloaded)) {
+		CreateCatalogue($Downloaded);
+		# NoDownload if in --first-only
+		if($FirstOnly) {
+			PerformNoDownload();
+		}
+	}
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Initialize program
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Detect our mode first.
+ModeDetection();
+
+# Parse commandline arguments
+GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
+	'version' => sub { Version(); exit 0},
+	'help|h' => sub { Help(); exit 0; },
+	'no-download|nodownload|w' => sub { Arg_Verbose(); $NoDownload = "1" },
+	'dry-run|dryrun|u' => sub { Arg_Verbose(); $DryRun_Mode = "1"},
+	'first-only|firstonly|first|f' => \$FirstOnly,
+	'nolog|l' => sub { $NoLog = "2"},
+	'copy|c=s'=> \$CopyFilesTo,
+	'clean' => sub {
+		CleanupDirs();
+		exit(0);
+	},
+	'files|n=s' => \$FileNumber,
+	'delete|d' => \$CopyFiles_Delete,
+	'rmold|o' => \$RemoveOldFiles,
+	'silent|s' => sub { 
+		$Verbose = 0;
+		$NoLog = 0 unless $NoLog == 2;
+		@CurlVerbosity = ("--silent", "--show-error");
+	},
+	'ignore-pattern|ignorepattern|i=s' => sub {
+		$IgnorePattern = $_[1];
+		eval { qr/$IgnorePattern/ } or die "The regexp supplied to --ignore-pattern is invalid.\n";
+	},
+	# Display some simple statistics
+	'stats' => sub { die "The \"catalogue/All\" directory did not exist, are you sure you have downloaded anything?\n" unless -d "$Config{WorkingDir}/catalogue/All";
+		ModeDetection();
+		my @PodcastFileList = SortedFileList("$Config{WorkingDir}/catalogue/All");
+		print "\nYou have ", scalar @PodcastFileList, " files\n";
+		print "The newest file is: ", basename($PodcastFileList[0]),"\n";
+		print "The oldest file is: ", basename($PodcastFileList[-1]),"\n";
+		# Find filesizes
+		my $USED_DISKSPACE = 0;
+		foreach (glob("$Config{WorkingDir}/catalogue/All/*")) {
+			# Skip the file if -s doesn't return anything useful.
+			if (-s $_) {
+	        		$USED_DISKSPACE = $USED_DISKSPACE+-s $_;
+			}
+		}
+		$USED_DISKSPACE = $USED_DISKSPACE/1024/1024;
+		print "The files are using ", sprintf ("%.0f", "$USED_DISKSPACE"), " MB of diskspace\n";
+		exit 0 
+	},
+	# Display information about which config files and settings we would use
+	'dumpinfo' => sub { DumpInfo(); exit 0 },
+	'debuginfo' => sub { DumpInfo(1); exit 0 },
+) or die "Run ", basename($0), " --help for help\n";
+
+# print \n if we're in verbose mode
+printv("\n");
+
+# Conflicting commandline arguments
+die "Conflicting options: --first-only and --no-download. Please read --help\n" if $FirstOnly and $NoDownload;
+die "Conflicting options: --copy and --rmold. You can't use both at the same time.\n" if $CopyFilesTo and $RemoveOldFiles;
+# Useless usage of some options
+warn "Useless use of --delete without --copy\n" if $CopyFiles_Delete and not $CopyFilesTo;
+warn "Useless use of --files without --copy or --rmold\n" if $FileNumber and not $CopyFilesTo and not $RemoveOldFiles;
+warn "Useless use of --nolog in verbose mode\n" if $Verbose and $NoLog == 2;
+
+# We test for $RemoveOldfiles here because it should never use the $IgnorePattern from the config file
+DeleteOldPodcasts() if $RemoveOldFiles;
+
+# if --ignore-pattern was not supplied but $IgnorePattern is set in the config file.
+unless ($IgnorePattern) {
+	if ($Config{IgnorePattern}) {
+		eval { qr/$Config{IgnorePattern}/ } or die "The regexp IgnorePattern in the configuration file is invalid!\n";
+		$IgnorePattern = $Config{IgnorePattern};
+	}
+}
+
+# If we're copying then run the CopyFiles() subroutine
+CopyFiles if $CopyFilesTo;
+# Make sure we have curl
+die "GoldenPod requires curl to work, you don't seem to have curl installed!\nPlease install curl, then re-run GoldenPod\n" unless (InPath "curl");
+
+die "The configuration file \"$Config\" does not exist!\nPlease read the manpage included to get instructions on how to set one up.\n" unless -e $Config;
+
+PerformMain();
+__END__
+=encoding utf8
+
+=head1 NAME
+
+goldenpod - a podcast client written in perl
+
+=head1 SYNOPSIS
+
+B<goldenpod> [I<OPTIONS>]
+
+=head1 DESCRIPTION
+
+B<GoldenPod> is a podcast client (or podcast aggregator, or podcatcher, feel free
+to pick whichever name you want) written in perl.
+
+It supports reading configuration files in ~/.goldenpod/ and then saving the
+podcasts to the directory defined there (by default ~/Podcasts/). It also supports
+just getting thrown into a directory where BashPodder used to be and replacing
+it automagically, or having its config files in the same directory as itself
+and then just being run from a random location and detecting and performing a chdir correctly.
+This, along with being able to run in silent mode by simply adding -s
+or changing the corresponding option in the configuration file makes
+GoldenPod both cron-friendly and user-friendly.
+
+=head1 ADDING PODCAST FEEDS TO GOLDENPOD
+
+GoldenPod has two different configuration files. One is I<goldenpod.conf>
+the other is the podcasts configuration file. The goldenpod.conf file
+should hopefully explain itself.
+
+The syntax of the podcasts configuration file is simple; for each podcast
+you want B<goldenpod> to download you add the URL to the RSS feed on a line
+by its own to the podcasts configuration file. That is either one of
+I<~/.goldenpod/podcasts.conf>, I<./podcasts.conf> or I<./bp.conf>.
+GoldenPod will first check for ./podcasts.conf, then ./bp.conf and lastly
+~/.goldenpod/podcasts.conf - it will never read more than one podcasts
+configuration file.
+
+After adding you can simply run goldenpod to synchronize those feeds. The first
+time you run goldenpod to synchronize a feed you might want to use --first-only
+(see further down for more information about --first-only).
+
+I<Example podcasts.conf>
+
+	# Put your podcast feed URLs in this file seperated by newlines
+	# All lines starting with # are ignored
+
+	# Paranormal podcast
+	http://paranormalpodcast.libsyn.com/rss
+
+	# Perlcast (perl related podcast)
+	http://www.perlcast.com/rss/current.xml
+
+	# LUG Radio
+	http://www.lugradio.org/episodes.rss
+
+	# The delta park project
+	http://deltaparkproject.com/feed.cfm
+
+	# Jawbone radio
+	http://feeds.feedburner.com/JawboneRadio
+
+	# Infidelguy
+	http://www.infidelguy.com/infidelguy_shows.rss
+
+=head1 OPTIONS
+
+=over
+
+=item B<-h, --help>
+
+Display the help screen
+
+=item B<-v, --verbose>
+
+Be verbose.
+
+=item B<-s, --silent>
+
+Be silent.
+
+=item B<-l, --nolog>
+
+Don't create a message logfile when in non-verbose mode.
+Has no use with B<--verbose>
+
+=item B<--dumpinfo>
+
+Print the configuration and podcast list filenames that GoldenPod would read, in addition
+to the logfiles it would use and write to.
+
+=item B<--stats>
+
+Print some simple statistics: How many files you currently have in your catalogue, which file
+is the latest, which file is the oldest and how much space they are using.
+
+=item B<-u, --dry-run>
+
+Used along with --copy or --rmold. Just display what would be done,
+don't actually copy or delete anything.
+Implies B<--verbose>
+
+=item B<-w, --no-download>
+
+Only write the logfile, don't download anything. Useful when you want to subscribe to a podcast but not
+download all of the old issues. You can edit the logfile afterwards and remove those you want to download.
+Implies B<--verbose>.
+
+=item B<-f, --first-only>
+
+Only download the first file in any feed, permanently ignore the others.
+So running --first-only will fetch the first file in the feed, and then
+permanently ignore any older ones - but will (unless you use --first-only) download
+all later files. If you want to download any older you will need to edit the logfile.
+Unlike --no-download this does not imply --verbose
+
+=item B<-c, --copy I</path>>
+
+Copy the last N downloaded files to /path/ and delete the other files in /path/.
+This is very useful for synchronizing the latest podcasts with your MP3 player.
+N is either 4 by default or optionally the value supplied to --files.
+
+=item B<-d, --delete>
+
+For use with --copy, delete all files in /path/ unless they are one of the
+files we are about to copy. It will not allow you to delete files directly in your
+home directory (but all subdirectories except Documents) nor any files in
+/usr /var /dev /etc /lib /sbin /sys /boot or /proc.
+
+=item B<-n, --files I<N>>
+
+For use with --copy or --rmold. Copy/delete N files instead of 4.
+
+=item B<-o, --rmold>
+
+Delete N old podcasts, where N is either 4 or optionally the value supplied to
+--files. Use this to free up some disk space taken up by old podcasts.
+This will obey --ignore-pattern but not the $IgnorePattern configuration
+option. It will always leave at least the latest podcast.
+
+=item B<-i, --ignore-pattern>
+
+Ignore files matching the regular expression pattern supplied when downloading
+or copying podcasts.
+
+For example: "--ignore-pattern foo" would ignore any
+podcast containing the word "foo" in its filename, or for a more advanced
+example: "--ignore-pattern '(foo|bar|baz)'" would ignore all
+podcasts containing either of the words foo, bar or baz in it's
+filename. Like everything else the --ignore-pattern expression is case sensitive.
+If you would like to match both Foo and foo you could do: "--ignore-pattern [f|F]oo".
+--ignore-pattern supports standard perl regular expressions (will be executed within m//).
+
+=item B<--clean>
+
+Clean up the podcasts directory and catalogue. This is useful if you removed files
+by hand. It will remove empty directories, remove orphaned symlinks in the catalogue
+and rewrite playlists. This is also done after --rmold.
+
+=back
+
+=head1 HELP/SUPPORT
+
+If you need additional help you can submit a support request at
+<https://savannah.nongnu.org/support/?group=goldenpod>
+
+=head1 DEPENDENCIES
+
+Besides from perl it also requires curl.
+
+=head1 INCOMPATIBILITIES
+
+This version of GoldenPod uses a new configuration syntax that is not
+backwards compatible with GoldenPod versions 0.1 to 0.6 (however it can
+upgrade the old configuration syntax to the new one).
+
+The directories created by this version will always be YYYY-MM-DD, while
+0.1 to 0.6 could be YYYY-MM-D.
+
+=head1 AUTHOR
+
+B<GoldenPod> is written by Eskild Hustvedt I<<zerodogg at skolelinux dot no>>
+
+=head1 FILES
+
+=over
+
+=item I<~/.goldenpod/podcasts.conf> or I<./podcasts.conf>
+
+The file containing a list of podcast feeds, alternatively I<./bp.conf>
+
+=item I<~/.goldenpod/goldenpod.conf>
+
+The configuration file for GoldenPod, which contains the location to save
+streams to, your desired verbosity level, the default IgnorePattern and if you
+want to use the PodcastFilter.
+
+=item I<~/.goldenpod/podcasts.log> or I<./podcasts.log>
+
+The logfile containing the URLs for the podcasts already downloaded.
+This file will be I<podcast.log> if working in bashpodder compatibility mode.
+
+=item I<~/.goldenpod/goldenpod.log> or I<./goldenpod.log>
+
+The logfile written to when in silent mode.
+
+=item I</etc/goldenpod-podcasts.conf>
+
+This is a file in the same syntax as podcasts.conf. It is copied to ~/.goldenpod/podcasts.conf
+the first time goldenpod is run if it exists. This file is never read directly, and has no
+effect whatsoever after the first time goldenpod is run.
+
+=back
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) Eskild Hustvedt 2005, 2006, 2007
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
