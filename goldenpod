@@ -714,8 +714,7 @@ sub RewritePlaylists
 	{
 		next unless -d $_;
 		# Skip the All directory
-		# FIXME: Don't blindly assume there are no other dirs ending in All
-		next if $_ =~ /All$/;
+		next if basename($_) eq 'All';
 		# This variable will be 1 if we wrote something to the playlist
 		my $WrotePlaylistContent = 0;
 		# The dirname, as used in the playlist filenames
@@ -1575,9 +1574,6 @@ I<Example podcasts.conf>
 
 	# LUG Radio
 	http://www.lugradio.org/episodes.rss
-
-	# The delta park project
-	http://deltaparkproject.com/feed.cfm
 
 	# Jawbone radio
 	http://feeds.feedburner.com/JawboneRadio
