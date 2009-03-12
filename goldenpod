@@ -15,10 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Enforce strict coding practices and warnings
+# Force strict mode, and useful warnings
 use strict;
 use warnings;
-# Die when one of these fails
+
+# Make perl automatically die if any of these fails
 use Fatal qw/ open chdir mkdir /;
 # Used to find our directory and name
 use File::Basename;
@@ -48,6 +49,7 @@ my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config);
 
 # Version number
 my $Version = '0.7';			# My version
+my $UserAgent = 'GoldenPod '.$Version.' (podcatcher)';
 # Default is that curl is silent but displays errors (logged, not to STDOUT)
 my @CurlVerbosity = qw(--silent --show-error);
 # Curl options:
@@ -55,7 +57,7 @@ my @CurlVerbosity = qw(--silent --show-error);
 # -k for insecure (allow ssl servers with odd certificates)
 # -L to follow location hints
 # -A sets the user agent string
-my @CurlGlobal = ( qw(-C -k -L -A),"GoldenPod $Version - http://goldenpod.nongnu.org/");
+my @CurlGlobal = ( qw(-C -k -L -A),$UserAgent);
 
 # Get the current date
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
@@ -271,7 +273,9 @@ sub fetchURL
 		$prevLen = 0;
 		$LWP_InitialOut = 0;
 		# GPLWP is a GoldenPod wrapper around LWP
-		my $UA = GPLWP->new();
+		my $UA = GPLWP->new(
+			agent => $UserAgent.' libwwwperl',
+		);
 		my $response;
 		if ($targetFile)
 		{
@@ -929,7 +933,8 @@ sub CopyFiles
 
 # Purpose: Write a configuration file
 # Usage: WriteConfigFile(/FILE, \%ConfigHash, \%ExplanationHash);
-sub WriteConfigFile {
+sub WriteConfigFile
+{
 	my ($File, $Config, $Explanations) = @_;
 
 	# Open the config for writing
@@ -957,7 +962,8 @@ sub WriteConfigFile {
 #  or skipped completely (by replacing it by undef).
 #  If OnlyValidOptions is true it will cause LoadConfigFile to skip options not in
 #  the OptionRegexHash.
-sub LoadConfigFile {
+sub LoadConfigFile
+{
 	my ($File, $ConfigHash, $OptionRegex, $OnlyValidOptions) = @_;
 
 	open(my $CONFIG, '<', "$File") or do {
@@ -995,9 +1001,11 @@ sub LoadConfigFile {
 
 # Purpose: Load the global config file from $UserConfigDir
 # Usage: InitGlobalConfig();
-sub InitGlobalConfig {
+sub InitGlobalConfig
+{
 	# Create the directory if it isn't already there
-	if(not -e $UserConfigDir) {
+	if(not -e $UserConfigDir)
+	{
 		InitConfigDir();
 	}
 	my %OptionRegexHash = (
@@ -1015,7 +1023,8 @@ sub InitGlobalConfig {
 		);
 
 	LoadConfigFile("$UserConfigDir/goldenpod.conf", \%Config, \%OptionRegexHash);
-	if(defined($Config{'$WorkingDir '})) {
+	if(defined($Config{'$WorkingDir '}))
+	{
 		print 'Migrating old configuration format...';
 		foreach (qw#$WorkingDir $DefaultVerbosity $IgnorePattern $PodcastFilter#) {
 			my $OptName = $_;
@@ -1036,7 +1045,8 @@ sub InitGlobalConfig {
 
 # Purpose: Write the configuration file
 # Usage: WriteConfig();
-sub WriteGPConfig {
+sub WriteGPConfig
+{
 	# Verify the options first
 	if(not defined $Config{WorkingDir} or not length($Config{WorkingDir}))
 	{
@@ -1061,16 +1071,19 @@ sub WriteGPConfig {
 
 # Purpose: Creates ~/.goldenpod or another $UserConfigDir
 # Usage: InitConfigDir();
-sub InitConfigDir {
+sub InitConfigDir
+{
 	mkdir $UserConfigDir or die "Unable to create the directory $UserConfigDir: $!" if not -e $UserConfigDir;
 	# If /etc/goldenpod-podcasts.conf exists the copy that to ~/.goldenpod/podcasts.conf
-	if ( -e '/etc/goldenpod-podcasts.conf' ) {
+	if ( -e '/etc/goldenpod-podcasts.conf' )
+	{
 		warn "Copying /etc/goldenpod-podcasts.conf to $UserConfigDir/podcasts.conf";
 		copy('/etc/goldenpod-podcasts.conf', "$UserConfigDir/podcasts.conf") or warn "Copying of /etc/goldenpod-podcasts.conf failed: $!";
 	}
 	# If we don't have ~/.goldenpod/podcasts.conf (no /etc/goldenpod.conf or failure copying it)
 	# then write an empty one.
-	if(not -e "$UserConfigDir/podcasts.conf" ) {
+	if(not -e "$UserConfigDir/podcasts.conf" )
+	{
 		open(my $PODCASTS_CONF, '>',"$UserConfigDir/podcasts.conf");
 		print $PODCASTS_CONF "# Put your podcast feed URLs in this file seperated by newlines\n# All lines starting with # are ignored";
 		close($PODCASTS_CONF);
@@ -1080,7 +1093,8 @@ sub InitConfigDir {
 
 # Purpose: Detect which mode we are running in
 # Usage: ModeDetection();
-sub ModeDetection {
+sub ModeDetection
+{
 	my ($Mode, $LocalDir);
 	# First check if we can use files in ./
 	if (-e './bp.conf' or -e './podcasts.conf')
@@ -1159,7 +1173,8 @@ sub ModeDetection {
 
 # Purpose: Make us verbose
 # Usage: Arg_Verbose();
-sub Arg_Verbose { 
+sub Arg_Verbose
+{ 
 	$Verbose = 1;
 	$NoLog = 1 if not $NoLog;
 	@CurlVerbosity = '-#';
