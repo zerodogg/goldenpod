@@ -128,7 +128,7 @@ sub PrintHelp
 		$GeneratedDesc .= $part;
 	}
 	# Something went wrong
-	die("Option mismatch") if not $GeneratedDesc;
+	die('Option mismatch') if not $GeneratedDesc;
 	# Print it all
 	foreach my $description (split(/\n/,$GeneratedDesc))
 	{
@@ -201,7 +201,7 @@ sub LWPProgress
 	{
 		if(not $LWP_InitialOut)
 		{
-			print "Downloading... ";
+			print 'Downloading... ';
 			$LWP_InitialOut = 1;
 		}
 		else
@@ -239,7 +239,7 @@ sub initDownload
 	if(eval('use LWP::UserAgent; 1;'))
 	{
 		$Has{LWP} = 1;
-		eval("package GPLWP; our \@ISA = qw(LWP::UserAgent); sub progress { shift; return main::LWPProgress(\@_)};");
+		eval('package GPLWP; our @ISA = qw(LWP::UserAgent); sub progress { shift; return main::LWPProgress(@_)};');
 		return;
 	}
 	
@@ -394,14 +394,14 @@ sub printv
 sub PrepareLogging
 {
 	# Unless we're verbose, write stuff to $ProgramLog
-	open(STDOUT, ">>",$ProgramLog) unless $NoLog;
-	open(STDERR, ">>",$ProgramLog) unless $NoLog;
+	open(STDOUT, '>>',$ProgramLog) if not $NoLog;
+	open(STDERR, '>>',$ProgramLog) if not $NoLog;
 
 	# If we're in logging mode then log the date and time started
-	print "Started at " . localtime(time) unless $NoLog;
+	print 'Started at ' . localtime(time) if not $NoLog;
 	# If we're not verbose and $NoLog is 2 (-l) then write stuff to /dev/null ;)
-	open(STDOUT, ">", "/dev/null") if $NoLog and $NoLog == 2;
-	open(STDERR, ">", "/dev/null") if $NoLog and $NoLog == 2;
+	open(STDOUT, '>', '/dev/null') if $NoLog and $NoLog == 2;
+	open(STDERR, '>', '/dev/null') if $NoLog and $NoLog == 2;
 }
 
 # Purpose: Check for a file in path
@@ -416,14 +416,15 @@ sub InPath
 #  Returns 1 if it is empty, 0 if it isn't.
 sub DirIsEmpty
 {
-        opendir(TESTDIR, $_[0]);
-        my @TestDir = readdir(TESTDIR);
-        closedir(TESTDIR);
-        unless (scalar @TestDir > 2)
-		{
-                return true;
-        }
-        return false;
+	my $dir = shift;
+	opendir(TESTDIR, $dir);
+	my @TestDir = readdir(TESTDIR);
+	closedir(TESTDIR);
+	if(not scalar @TestDir > 2)
+	{
+		return true;
+	}
+	return false;
 }
 
 # Purpose: Clear the screen
@@ -450,11 +451,12 @@ sub Clear
 # Usage: my $NewNumber = PrefixZero(NUMBER);
 sub PrefixZero
 {
-	if ($_[0] =~ /^\d$/)
+	my $number = shift;
+	if ($number =~ /^\d$/)
 	{
-		return("0$_[0]");
+		return("0$number");
 	}
-	return($_[0]);
+	return($number);
 }
 
 # Purpose: Get OS/distro version information
@@ -479,7 +481,7 @@ sub GetDistVer
 	# GNU/Linux and BSD
 	foreach(qw/mandriva mandrakelinux mandrake fedora redhat red-hat ubuntu debian gentoo suse distro dist slackware freebsd openbsd netbsd dragonflybsd NULL/)
 	{
-		if (-e "/etc/$_-release" or -e "/etc/$_-version" or -e "/etc/${_}_version" or $_ eq "NULL") {
+		if (-e "/etc/$_-release" or -e "/etc/$_-version" or -e "/etc/${_}_version" or $_ eq 'NULL') {
 			my ($DistVer, $File, $VERSION_FILE);
 			if(-e "/etc/$_-release") {
 				$File = "$_-release";
@@ -565,6 +567,7 @@ sub GetDistVer
 # Usage: DumpInfo();
 sub DumpInfo
 {
+	my $debugInfo = shift;
 	Version();
 	print "\n";
 	my $pattern = "%-28s: %s\n";
@@ -573,7 +576,7 @@ sub DumpInfo
 	printf($pattern, 'Logfile',$ProgramLog) if ($Verbose and not $NoLog);
 	printf($pattern, 'List of downloaded podcasts',$PodcastLog);
 	printf($pattern, 'Target download directory',$Config{WorkingDir});
-	if($_[0])
+	if($debugInfo)
 	{
 		printf($pattern, 'Perl version', sprintf('%vd',$^V));
 		printf($pattern, 'OS',GetDistVer());
@@ -601,10 +604,10 @@ sub DumpInfo
 sub PerformNoDownload
 {
 	printv("\nWriting older podcasts to the logfile...") if not $FirstOnly;
-	open(my $LOGFILE, ">>",$PodcastLog);
+	open(my $LOGFILE, '>>',$PodcastLog);
 	foreach (keys (%NoDownload))
 	{
-		print $LOGFILE "$_\n" unless $AlreadyDownloaded{$_};
+		print $LOGFILE "$_\n" if not $AlreadyDownloaded{$_};
 	}
 	printv(" done\n") if not $FirstOnly;
 	close($LOGFILE);
@@ -643,12 +646,12 @@ sub SortedFileList
 	foreach my $FileName (glob("$FromDir/*"))
 	{
 		# Is it a link? If it isn't then we don't bother testing it
-		next unless -l $FileName;
+		next if not -l $FileName;
 		# If the link points to something that doesn't exist them we omit it.
 		if (-e (readlink $FileName))
 		{
 			# We don't care about directories
-			unless (-d $FileName) {
+			if(not -d $FileName) {
 				$FileCopyList{Cwd::realpath(readlink($FileName))} = 1;
 			}
 		}
@@ -671,14 +674,14 @@ sub CleanCatalogue
 	# For compatibility with older GoldenPods
 	my $CWD = getcwd();
 	chdir($CatalogueBase);
-	print "Cleaning up the catalogue...";
+	print 'Cleaning up the catalogue...';
 	foreach my $CurrentDirectory (glob("$CatalogueBase/*"))
 	{
 		chdir($CurrentDirectory);
 		foreach my $CurrentFile (glob("$CurrentDirectory/*"))
 		{
-			next unless -l $CurrentFile;
-			unless (-e readlink($CurrentFile))
+			next if not -l $CurrentFile;
+			if(not -e readlink($CurrentFile))
 			{
 				unlink($CurrentFile);
 			}
@@ -696,7 +699,7 @@ sub RemoveEmptyDirs
 	my $FromDirectory = shift;
 	foreach my $Directory (glob("$FromDirectory/*"))
 	{
-		next unless -d $Directory;
+		next if not -d $Directory;
 		rmdir($Directory) if DirIsEmpty($Directory);
 	}
 }
@@ -708,11 +711,11 @@ sub RemoveEmptyDirs
 sub RewritePlaylists
 {
 	my $CatalogueBase = shift;
-	print "Rewriting playlists...";
+	print 'Rewriting playlists...';
 	my $CWD = getcwd();
 	foreach (glob("$CatalogueBase/*"))
 	{
-		next unless -d $_;
+		next if not -d $_;
 		# Skip the All directory
 		next if basename($_) eq 'All';
 		# This variable will be 1 if we wrote something to the playlist
@@ -727,7 +730,7 @@ sub RewritePlaylists
 			next;
 		}
 		# Open our new playlist
-		open(my $PLAYLIST, ">", "$_/$DirName.m3u");
+		open(my $PLAYLIST, '>', "$_/$DirName.m3u");
 		chdir($_);
 		# Create the playlist based upon the output of SortedFileList
 		foreach my $CurrentFile (SortedFileList($_))
@@ -739,7 +742,7 @@ sub RewritePlaylists
 			$WrotePlaylistContent = 1;
 		}
 		close($PLAYLIST);
-		unlink("$_/$DirName.m3u") unless $WrotePlaylistContent;
+		unlink("$_/$DirName.m3u") if not $WrotePlaylistContent;
 		chdir($CWD);
 	}
 	print "done\n";
@@ -758,7 +761,7 @@ sub CleanupDirs
 	# Rewrite the playlists, removing the dead files
 	RewritePlaylists($CatalogueDirectory);
 	# Remove empty directories
-	print "Removing empty directories...";
+	print 'Removing empty directories...';
 	RemoveEmptyDirs($CatalogueDirectory);
 	RemoveEmptyDirs($Config{WorkingDir});
 	print "done\n";
@@ -781,7 +784,7 @@ sub DeleteOldPodcasts
 	my (@FileList, %Files, @RemoveTheseFiles);
 	my $NumberOfFiles = HowManyFiles();
 	# Make sure the all All directory exists
-	die("The $CatalogueDirectory/All directory did not exist!\nAre you sure you have downloaded some podcasts?\n") unless -d "$CatalogueDirectory/All";
+	die("The $CatalogueDirectory/All directory did not exist!\nAre you sure you have downloaded some podcasts?\n") if not -d "$CatalogueDirectory/All";
 	# Figure out which files are the oldest podcasts
 	@FileList = reverse SortedFileList("$CatalogueDirectory/All");
 	my $PodcastCount = @FileList;
@@ -801,7 +804,7 @@ sub DeleteOldPodcasts
 	my $DeletedFiles = 0;
 	while ($NumberOfFiles > $DeletedFiles) {
 		my $TargetBase = basename($FileList[0]);
-		unless ($IgnorePattern and $TargetBase =~ /$IgnorePattern/)
+		if($IgnorePattern and not $TargetBase =~ /$IgnorePattern/)
 		{
 			# If we're in dry run mode then we don't want to actually do anything.
 			if ($DryRun_Mode)
@@ -823,7 +826,7 @@ sub DeleteOldPodcasts
 			$DeletedFiles++;
 		}
 		shift @FileList;
-		last unless $FileList[0];
+		last if not $FileList[0];
 	}
 	# Stop here if we're in dry run mode
 	exit if $DryRun_Mode;
@@ -839,10 +842,10 @@ sub CopyFiles
 	my (@FileList, %Files, @CopyTheseFiles, %DontDeleteThese);
 	my $NumberOfFiles = HowManyFiles();
 	# Do a few directory checks before moving on.
-	die "The ./catalogue/All/ directory did not exist!\nAre you sure you have downloaded some podcasts?\n" unless -e "./catalogue/All/";
-	die "$CopyFilesTo does not exist!\n" 			unless -e $CopyFilesTo;
-	die "$CopyFilesTo is not a directory!\n"		unless -d $CopyFilesTo;
-	die "I can't write to the directory $CopyFilesTo!\n"	unless -w $CopyFilesTo;
+	die "The ./catalogue/All/ directory did not exist!\nAre you sure you have downloaded some podcasts?\n" if not -e './catalogue/All/';
+	die "$CopyFilesTo does not exist!\n" 			if not -e $CopyFilesTo;
+	die "$CopyFilesTo is not a directory!\n"		if not -d $CopyFilesTo;
+	die "I can't write to the directory $CopyFilesTo!\n"	if not -w $CopyFilesTo;
 	
 	# Figure out which files are the latest podcasts
 	# A sorted array of files
@@ -853,7 +856,7 @@ sub CopyFiles
 	{
 		my $TargetBase = basename($FileList[$CopiedFiles]);
 		# Check if we want to skip files matching a specific regexp
-		unless ($IgnorePattern and $TargetBase =~ /$IgnorePattern/)
+		if($IgnorePattern and not $TargetBase =~ /$IgnorePattern/)
 		{
 			push(@CopyTheseFiles, $FileList[$CopiedFiles]);
 			$DontDeleteThese{$TargetBase} = 1;
@@ -911,10 +914,10 @@ sub CopyFiles
 		}
 	}
 	# And finally, attempt to run sync once.
-	if (InPath "sync" and not $DryRun_Mode)
+	if (InPath 'sync' and not $DryRun_Mode)
 	{
-		printv("Synchronizing disks...");
-		system("sync");
+		printv('Synchronizing disks...');
+		system('sync');
 	}
 	printv("All done\n");
 	exit
@@ -939,7 +942,7 @@ sub WriteConfigFile {
 		print $CONFIG "# $Explanations->{HEADER}\n";
 	}
 	foreach(sort(keys(%{$Config}))) {
-		next unless length($Config->{$_});	# Don't write empty options
+		next if not length($Config->{$_});	# Don't write empty options
 		if(defined($Explanations->{$_})) {
 			print $CONFIG "\n# $Explanations->{$_}";
 		}
@@ -958,12 +961,12 @@ sub LoadConfigFile {
 	my ($File, $ConfigHash, $OptionRegex, $OnlyValidOptions) = @_;
 
 	open(my $CONFIG, '<', "$File") or do {
-		warn(sprintf("Unable to read the configuration settings from %s: %s", $File, $!));
+		warn(sprintf('Unable to read the configuration settings from %s: %s', $File, $!));
 		return(0);
 	};
 	while(<$CONFIG>) {
 		next if m/^\s*(#.*)?$/;
-		next unless m/=/;
+		next if not m/=/;
 		chomp;
 		my $Option = $_;
 		my $Value = $_;
@@ -994,7 +997,7 @@ sub LoadConfigFile {
 # Usage: InitGlobalConfig();
 sub InitGlobalConfig {
 	# Create the directory if it isn't already there
-	unless(-e $UserConfigDir) {
+	if(not -e $UserConfigDir) {
 		InitConfigDir();
 	}
 	my %OptionRegexHash = (
@@ -1013,10 +1016,10 @@ sub InitGlobalConfig {
 
 	LoadConfigFile("$UserConfigDir/goldenpod.conf", \%Config, \%OptionRegexHash);
 	if(defined($Config{'$WorkingDir '})) {
-		print "Migrating old configuration format...";
+		print 'Migrating old configuration format...';
 		foreach (qw#$WorkingDir $DefaultVerbosity $IgnorePattern $PodcastFilter#) {
 			my $OptName = $_;
-			print ".";
+			print '.';
 			$OptName = "$OptName ";
 			my $Opt = $Config{$OptName};
 			$Opt =~ s/^\"(.*)\";?$/$1/;
@@ -1024,7 +1027,7 @@ sub InitGlobalConfig {
 			$OptName =~ s/^\$(\w+)\s*/$1/;
 			$Config{$OptName} = $Opt;
 		}
-		print ".";
+		print '.';
 		WriteGPConfig();
 		print "done\n";
 	}
@@ -1035,7 +1038,8 @@ sub InitGlobalConfig {
 # Usage: WriteConfig();
 sub WriteGPConfig {
 	# Verify the options first
-	unless(defined($Config{WorkingDir}) and length($Config{WorkingDir})) {
+	if(not defined $Config{WorkingDir} or not length($Config{WorkingDir}))
+	{
 		$Config{WorkingDir} = "$ENV{HOME}/Podcasts";
 	}
 	if(not defined($Config{DefaultVerbosity}) or not length($Config{DefaultVerbosity})) {
@@ -1058,16 +1062,16 @@ sub WriteGPConfig {
 # Purpose: Creates ~/.goldenpod or another $UserConfigDir
 # Usage: InitConfigDir();
 sub InitConfigDir {
-	mkdir $UserConfigDir or die "Unable to create the directory $UserConfigDir: $!" unless -e $UserConfigDir;
+	mkdir $UserConfigDir or die "Unable to create the directory $UserConfigDir: $!" if not -e $UserConfigDir;
 	# If /etc/goldenpod-podcasts.conf exists the copy that to ~/.goldenpod/podcasts.conf
-	if ( -e "/etc/goldenpod-podcasts.conf" ) {
+	if ( -e '/etc/goldenpod-podcasts.conf' ) {
 		warn "Copying /etc/goldenpod-podcasts.conf to $UserConfigDir/podcasts.conf";
-		copy("/etc/goldenpod-podcasts.conf", "$UserConfigDir/podcasts.conf") or warn "Copying of /etc/goldenpod-podcasts.conf failed: $!";
+		copy('/etc/goldenpod-podcasts.conf', "$UserConfigDir/podcasts.conf") or warn "Copying of /etc/goldenpod-podcasts.conf failed: $!";
 	}
 	# If we don't have ~/.goldenpod/podcasts.conf (no /etc/goldenpod.conf or failure copying it)
 	# then write an empty one.
-	unless ( -e "$UserConfigDir/podcasts.conf" ) {
-		open(my $PODCASTS_CONF, ">","$UserConfigDir/podcasts.conf");
+	if(not -e "$UserConfigDir/podcasts.conf" ) {
+		open(my $PODCASTS_CONF, '>',"$UserConfigDir/podcasts.conf");
 		print $PODCASTS_CONF "# Put your podcast feed URLs in this file seperated by newlines\n# All lines starting with # are ignored";
 		close($PODCASTS_CONF);
 	}
@@ -1079,34 +1083,39 @@ sub InitConfigDir {
 sub ModeDetection {
 	my ($Mode, $LocalDir);
 	# First check if we can use files in ./
-	if (-e "./bp.conf" or -e "./podcasts.conf") {
-		$Mode = "local";
+	if (-e './bp.conf' or -e './podcasts.conf')
+	{
+		$Mode = 'local';
 		$LocalDir = Cwd::getcwd;
 	}
 
 	# If we can't use files in ./ let's check something else
-	unless ($Mode) {
+	if (not $Mode)
+	{
 		# Check for files in the directory containing the goldenpod executeable (if that dir is -w)
 		my $BaseDirectory = dirname($0);
-		if (-w $BaseDirectory and (-e "$BaseDirectory/bp.conf" or -e "$BaseDirectory/podcasts.conf")) {
-			$Mode = "local";
-			$LocalDir = "$BaseDirectory";
+		if (-w $BaseDirectory and (-e $BaseDirectory.'/bp.conf' or -e $BaseDirectory.'/podcasts.conf'))
+		{
+			$Mode = 'local';
+			$LocalDir = $BaseDirectory;
 		}
-	} else {
+	}
+	else
+	{
 		# If we're in local mode because PWD is ~/.goldenpod then work in global
 		# mode instead.
-		$Mode = "global" if $LocalDir eq "$ENV{HOME}/.goldenpod";
+		$Mode = 'global' if $LocalDir eq $ENV{HOME}.'/.goldenpod';
 	}
 	# If all else fails (not that it's a bad thing really) we use ~/.goldenpod
 	if(not $Mode) {
-		$Mode = "global";
+		$Mode = 'global';
 	}
 	# Initialize config
-	$UserConfigDir = "$ENV{HOME}/.goldenpod";
+	$UserConfigDir = $ENV{HOME}.'/.goldenpod';
 	InitGlobalConfig();
 
 	# If we're working in local mode, set some specific settings.
-	if ($Mode eq "local") {
+	if ($Mode eq 'local') {
 		$ConfigDir = $LocalDir;
 		$Config{WorkingDir} = $LocalDir;
 	} else {
@@ -1114,27 +1123,36 @@ sub ModeDetection {
 	}
 
 	# Do base initialization
-	$ProgramLog = "$ConfigDir/goldenpod.log";	# When we are silent we log to this file
+	$ProgramLog = $ConfigDir.'/goldenpod.log';	# When we are silent we log to this file
 	# Use podcasts.log if it exists, use podcast.log if podcasts.log doesn't exist
 	# but podcast.log doesn't, use podcasts.log if neither exists.
 	# (yes this is annoying, note that it is podcast and podcastS)
-	if (-e "$ConfigDir/podcasts.log" or !-e "$ConfigDir/podcast.log") {
-		$PodcastLog = "$ConfigDir/podcasts.log";
-	} else {
-		$PodcastLog = "$ConfigDir/podcast.log";
+	if (-e $ConfigDir.'/podcasts.log' or not -e $ConfigDir.'/podcast.log')
+	{
+		$PodcastLog = $ConfigDir.'/podcasts.log';
+	}
+	else
+	{
+		$PodcastLog = $ConfigDir.'/podcast.log';
 	}
 	# Detect config file.
-	if (-e "$ConfigDir/podcasts.conf" or !-e "$ConfigDir/bp.conf") {
-		$Config = "$ConfigDir/podcasts.conf";
-	} else {
-		$Config = "$ConfigDir/bp.conf"
+	if (-e $ConfigDir.'/podcasts.conf' or not -e $ConfigDir.'/bp.conf')
+	{
+		$Config = $ConfigDir.'/podcasts.conf';
+	}
+	else
+	{
+		$Config = $ConfigDir.'/bp.conf';
 	}
 	# Be verbose by default if the user wants to
 	Arg_Verbose() if $Config{DefaultVerbosity};
 	# Create WorkingDir if it doesn't exist
-	mkdir $Config{WorkingDir} unless -e $Config{WorkingDir};
+	mkdir $Config{WorkingDir} if not -e $Config{WorkingDir};
 	# Require +w on WorkingDir
-	die "I cannot write to $Config{WorkingDir}!\n" unless -w $Config{WorkingDir};
+	if(not -w $Config{WorkingDir})
+	{
+		die("Unable to write to: $Config{WorkingDir}: Permission denied\n");
+	}
 	# Get the realpath to WorkingDir in case it is relative
 	$Config{WorkingDir} = realpath($Config{WorkingDir}) or die("Unable to fix the path of $Config{WorkingDir}\n");
 }
@@ -1142,9 +1160,9 @@ sub ModeDetection {
 # Purpose: Make us verbose
 # Usage: Arg_Verbose();
 sub Arg_Verbose { 
-	$Verbose = "1";
-	$NoLog = "1" unless $NoLog;
-	@CurlVerbosity = "-#";
+	$Verbose = 1;
+	$NoLog = 1 if not $NoLog;
+	@CurlVerbosity = '-#';
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1190,7 +1208,7 @@ sub ParseFeed
 	}
 	if (not $FeedTitle)
 	{
-		$FeedTitle = "";
+		$FeedTitle = '';
 	}
 	# Do the real parsing and add to @urls
 	# We want to extract all url='s
@@ -1199,7 +1217,7 @@ sub ParseFeed
 		$FeedContents =~ s/url\s*=\s*[\"\'](\Q$CurrUrl\E)[\"\']//i;
 		# Filter away non-audio feeds if the user wants it.
 		if ($Config{PodcastFilter}) {
-			next unless basename($CurrUrl) =~ /.*\.(ogg|mp3|m4a|wave?|flac|wmv|ape|tta|aac|mp2|mpa|ra|ram|aif|au|mpu).*/i;
+			next if not basename($CurrUrl) =~ /.*\.(ogg|mp3|m4a|wave?|flac|wmv|ape|tta|aac|mp2|mpa|ra|ram|aif|au|mpu).*/i;
 		}
 		# Filter away stuff in $IgnorePattern
 		if ($IgnorePattern) {
@@ -1226,11 +1244,11 @@ sub DownloadPodcasts
 	print "$NeedToDownload new podcasts.\n\n" if $NeedToDownload > 1;
 	print "$NeedToDownload new podcast.\n\n" if $NeedToDownload == 1;
 	# Open the logfile for writing
-	open(my $LOGFILE, ">>",$PodcastLog);
+	open(my $LOGFILE, '>>',$PodcastLog);
 	
 	# Download the podcasts
 	foreach (@{$DownloadThese}) {
-		unless ($DryRun_Mode) {
+		if (not $DryRun_Mode) {
 			print "Downloading $_\n";
 			# Curl returns nonzero on failure
 			my $DownloadStatus = DownloadURL("$Config{WorkingDir}/$date", $_);
@@ -1274,10 +1292,10 @@ sub CreateCatalogue
 	symlink "$Config{WorkingDir}/$date", "$Config{WorkingDir}/latest";
 
 	# Create our catalogue (podcasts sorted in named directories)
-	mkdir "$Config{WorkingDir}/catalogue" unless -e "$Config{WorkingDir}/catalogue";
-	mkdir "$Config{WorkingDir}/catalogue/All/" unless -e "$Config{WorkingDir}/catalogue/All/";
+	mkdir "$Config{WorkingDir}/catalogue" if not -e "$Config{WorkingDir}/catalogue";
+	mkdir "$Config{WorkingDir}/catalogue/All/" if not -e "$Config{WorkingDir}/catalogue/All/";
 	# For every file, make sure it has a catalogue entry.
-	foreach my $OrigName (@$Downloaded) {
+	foreach my $OrigName (@{$Downloaded}) {
 		# We don't want to do anything to playlists
 		next if ($OrigName =~ /\.m3u$/);
 		
@@ -1295,11 +1313,11 @@ sub CreateCatalogue
 			$PodBaseName =~ s/__+/_/g;			# Do some additional cleaning
 			$PodBaseName =~ s/[\-\_].$//;			# Remove -_ in the end of the name
 			$PodBaseName = "\u$PodBaseName";		# Make the first character be uppercase
-			$PodBaseName = "Unknown" unless $PodBaseName;	# Bah :(
+			$PodBaseName = 'Unknown' if not $PodBaseName;	# Bah :(
 		}
-		mkdir "$Config{WorkingDir}/catalogue/$PodBaseName" unless -d "$Config{WorkingDir}/catalogue/$PodBaseName";
+		mkdir "$Config{WorkingDir}/catalogue/$PodBaseName" if not -d "$Config{WorkingDir}/catalogue/$PodBaseName";
 		# We don't want to do anything if it already exists
-		unless (-e "$Config{WorkingDir}/catalogue/$PodBaseName/$BaseName") {
+		if (not -e "$Config{WorkingDir}/catalogue/$PodBaseName/$BaseName") {
 			# Try to get the extension
 			my $NameExtension = $BaseName;
 			$NameExtension =~ s/.*(\.\w)/$1/;
@@ -1307,12 +1325,12 @@ sub CreateCatalogue
 			symlink "$Config{WorkingDir}/$date/$BaseName", "$Config{WorkingDir}/catalogue/$PodBaseName/$BaseName";
 			unlink "$Config{WorkingDir}/catalogue/$PodBaseName/latest$NameExtension" if -e "$Config{WorkingDir}/catalogue/$PodBaseName/latest$NameExtension";
 			symlink "$Config{WorkingDir}/$date/$BaseName", "$Config{WorkingDir}/catalogue/$PodBaseName/latest$NameExtension";
-			open(my $PLAYLIST, ">>","$Config{WorkingDir}/catalogue/$PodBaseName/$PodBaseName.m3u");
+			open(my $PLAYLIST, '>>',"$Config{WorkingDir}/catalogue/$PodBaseName/$PodBaseName.m3u");
 			print $PLAYLIST "$BaseName\n";
 			close($PLAYLIST);
 		}
 		# Add it to All too if needed
-		unless (-e "$Config{WorkingDir}/catalogue/All/$BaseName") {
+		if (not -e "$Config{WorkingDir}/catalogue/All/$BaseName") {
 			symlink "$Config{WorkingDir}/$date/$BaseName", "$Config{WorkingDir}/catalogue/All/$BaseName";
 		}
 	}
@@ -1331,7 +1349,7 @@ sub FetchFeeds
 	# The list of podcasts to download in first-only mode
 	my @FirstOnly;
 	# Open the configuration file
-	open(my $CONFIG, "<", $Config);
+	open(my $CONFIG, '<', $Config);
 
 	# Read the configuration file and fetch feeds
 	while(my $podcast = <$CONFIG>) {
@@ -1357,7 +1375,7 @@ sub FetchFeeds
 	}
 
 	# If the config is empty, die.	
-	die "The podcast list in $Config is empty!\n" unless $ConfIsNotEmpty;
+	die "The podcast list in $Config is empty!\n" if not $ConfIsNotEmpty;
 
 	# Close the configuration file
 	close $CONFIG;
@@ -1369,7 +1387,7 @@ sub FetchFeeds
 	# Create the %AlreadyDownloaded hash.
 	if ( -e $PodcastLog) {
 		# Open the logfile containing previously downloaded files
-		open(my $LOGFILE, "<", $PodcastLog);
+		open(my $LOGFILE, '<', $PodcastLog);
 		# Add them to a hash
 		%AlreadyDownloaded = map { chomp; $_=>1 } <$LOGFILE>;
 		# Close the logfile
@@ -1419,12 +1437,12 @@ sub main
 	# Then fetch and parse our feeds.
 	my $DownloadQueue = FetchFeeds();
 	if(scalar(@{$DownloadQueue}) == 0) {
-		print "Nothing to download\n" unless $Verbose;
+		print "Nothing to download\n" if not $Verbose;
 		exit(0);
 	}
 	# Then download the podcasts
 	my $Downloaded = DownloadPodcasts($DownloadQueue);
-	if(scalar(@$Downloaded)) {
+	if(scalar(@{$Downloaded})) {
 		CreateCatalogue($Downloaded);
 		# NoDownload if in --first-only
 		if($FirstOnly) {
@@ -1444,10 +1462,10 @@ ModeDetection();
 GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 	'version' => sub { Version(); exit 0},
 	'help|h' => sub { Help(); exit 0; },
-	'no-download|nodownload|w' => sub { Arg_Verbose(); $NoDownload = "1" },
-	'dry-run|dryrun|u' => sub { Arg_Verbose(); $DryRun_Mode = "1"},
+	'no-download|nodownload|w' => sub { Arg_Verbose(); $NoDownload = 1 },
+	'dry-run|dryrun|u' => sub { Arg_Verbose(); $DryRun_Mode = 1},
 	'first-only|firstonly|first|f' => \$FirstOnly,
-	'nolog|l' => sub { $NoLog = "2"},
+	'nolog|l' => sub { $NoLog = 2},
 	'copy|c=s'=> \$CopyFilesTo,
 	'clean' => sub {
 		CleanupDirs();
@@ -1459,7 +1477,7 @@ GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 	'silent|s' => sub
 	{ 
 		$Verbose = 0;
-		$NoLog = 0 unless $NoLog == 2;
+		$NoLog = 0 if not $NoLog == 2;
 		@CurlVerbosity = qw(--silent --show-error);
 	},
 	'ignore-pattern|ignorepattern|i=s' => sub {
@@ -1467,12 +1485,12 @@ GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 		eval { qr/$IgnorePattern/ } or die "The regexp supplied to --ignore-pattern is invalid ($@)\n";
 	},
 	# Display some simple statistics
-	'stats' => sub { die "The \"catalogue/All\" directory did not exist, are you sure you have downloaded anything?\n" unless -d "$Config{WorkingDir}/catalogue/All";
+	'stats' => sub { die "The \"catalogue/All\" directory did not exist, are you sure you have downloaded anything?\n" if not -d "$Config{WorkingDir}/catalogue/All";
 		ModeDetection();
 		my @PodcastFileList = SortedFileList("$Config{WorkingDir}/catalogue/All");
 		print "\nYou have ", scalar @PodcastFileList, " files\n";
-		print "The newest file is: ", basename($PodcastFileList[0]),"\n";
-		print "The oldest file is: ", basename($PodcastFileList[-1]),"\n";
+		print 'The newest file is: ', basename($PodcastFileList[0]),"\n";
+		print 'The oldest file is: ', basename($PodcastFileList[-1]),"\n";
 		# Find filesizes
 		my $USED_DISKSPACE = 0;
 		foreach (glob("$Config{WorkingDir}/catalogue/All/*")) {
@@ -1482,13 +1500,13 @@ GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 			}
 		}
 		$USED_DISKSPACE = $USED_DISKSPACE/1024/1024;
-		print "The files are using ", sprintf ("%.0f", "$USED_DISKSPACE"), " MB of diskspace\n";
+		print 'The files are using ', sprintf ('%.0f', $USED_DISKSPACE), " MB of diskspace\n";
 		exit 0 
 	},
 	# Display information about which config files and settings we would use
 	'dumpinfo' => sub { DumpInfo(); exit 0 },
 	'debuginfo' => sub { DumpInfo(1); exit 0 },
-) or die "Run ", basename($0), " --help for help\n";
+) or die 'Run ', basename($0), " --help for help\n";
 
 # print \n if we're in verbose mode
 printv("\n");
@@ -1505,7 +1523,7 @@ warn "Useless use of --nolog in verbose mode\n" if $Verbose and $NoLog == 2;
 DeleteOldPodcasts() if $RemoveOldFiles;
 
 # if --ignore-pattern was not supplied but $IgnorePattern is set in the config file.
-unless ($IgnorePattern) {
+if (not $IgnorePattern) {
 	if ($Config{IgnorePattern}) {
 		eval { qr/$Config{IgnorePattern}/ } or die "The regexp IgnorePattern in the configuration file is invalid ($@)\n";
 		$IgnorePattern = $Config{IgnorePattern};
@@ -1515,7 +1533,7 @@ unless ($IgnorePattern) {
 # If we're copying then run the CopyFiles() subroutine
 CopyFiles if $CopyFilesTo;
 
-die "The configuration file \"$Config\" does not exist!\nPlease read the manpage included to get instructions on how to set one up.\n" unless -e $Config;
+die "The configuration file \"$Config\" does not exist!\nPlease read the manpage included to get instructions on how to set one up.\n" if not -e $Config;
 
 main();
 __END__
