@@ -164,6 +164,7 @@ sub Help
 		PrintHelp('-s', '--silent', 'Be silent (default)');
 	}
 	PrintHelp('', '--dumpinfo', 'Print the files goldenpod would work with');
+	PrintHelp('', '--prefer-curl', 'Prefer to use curl for downloading if available, instead of LWP (curl is used by default if LWP is missing)');
 	PrintHelp('', '--stats', 'Print some simple statistics');
 	PrintHelp('-l', '--nolog', 'Don\'t create a message logfile when in non-verbose mode.');
 	PrintHelp('-u', '--dry-run', 'Display what would be done but don\'t do it. Implies --verbose');
@@ -1521,6 +1522,7 @@ GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 	# Display information about which config files and settings we would use
 	'dumpinfo' => sub { DumpInfo(); exit 0 },
 	'debuginfo' => sub { DumpInfo(1); exit 0 },
+	'prefer-curl|prefercurl' => sub { $downloader = 'curl' },
 ) or die 'Run ', basename($0), " --help for help\n";
 
 # print \n if we're in verbose mode
@@ -1634,6 +1636,13 @@ Be silent.
 
 Don't create a message logfile when in non-verbose mode.  Has no use with
 B<--verbose>
+
+=item B<--prefer-curl>
+
+Prefer to use curl over LWP if present. GoldenPod uses LWP by default if it is
+available, and falls back to curl if LWP is missing. This parameter reverses
+this behaviour, using curl if it is available and falling back to LWP if curl
+is missing.
 
 =item B<--dumpinfo>
 
