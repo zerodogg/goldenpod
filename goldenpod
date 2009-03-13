@@ -432,26 +432,6 @@ sub DirIsEmpty
 	return false;
 }
 
-# Purpose: Clear the screen
-# Usage: Clear();
-sub Clear
-{
-	# Don't call it if we're not in verbose mode
-	return(0) if(not $Verbose);
-
-	# Use the system clear command if present
-	if (InPath('clear'))
-	{
-		system('clear');
-	}
-	else
-	{
-		# Otherwise, fall back to working perl hack
-		print "\n" foreach(1..120);
-		print "\b\r" foreach(1..120);
-	}
-}
-
 # Purpose: Prefix a "0" to a number if it is only one digit.
 # Usage: my $NewNumber = PrefixZero(NUMBER);
 sub PrefixZero
@@ -1255,8 +1235,8 @@ sub DownloadPodcasts
 	my $DownloadThese = shift;
 	my $NeedToDownload = scalar(@{$DownloadThese});
 	my @DownloadedFiles;
-	Clear();
 	# Output the amount of files we need to download
+	print "\n" if $NeedToDownload and $Verbose;
 	print "$NeedToDownload new podcasts.\n\n" if $NeedToDownload > 1;
 	print "$NeedToDownload new podcast.\n\n" if $NeedToDownload == 1;
 	# Open the logfile for writing
