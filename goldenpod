@@ -1194,7 +1194,7 @@ sub ModeDetection
 	InitGlobalConfig();
 
 	# If we're working in local mode, set some specific settings.
-	if ($Mode eq 'local')
+	if (defined $Mode and $Mode eq 'local')
 	{
 		$ConfigDir = $LocalDir;
 		$Config{WorkingDir} = $LocalDir;
