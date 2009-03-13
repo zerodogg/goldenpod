@@ -17,9 +17,8 @@ install:
 	mkdir -p "$(BINDIR)"
 	cp goldenpod "$(BINDIR)"
 	mkdir -p "$(DATADIR)"
-	cp gpconf "$(BINDIR)"
 	cp -r art "$(DATADIR)/goldenpod"
-	chmod 755 "$(BINDIR)/goldenpod" "$(BINDIR)/gpconf"
+	chmod 755 "$(BINDIR)/goldenpod"
 localinstall:
 	mkdir -p "$(BINDIR)"
 	ln -sf $(shell pwd)/goldenpod $(BINDIR)/
@@ -37,7 +36,6 @@ clean:
 # Verify syntax
 test:
 	@perl -c goldenpod
-	@perl -c gpconf
 	@perl -c devel-tools/SetVersion
 # Create a manpage from the POD
 man:
