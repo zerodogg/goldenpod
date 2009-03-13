@@ -1185,7 +1185,7 @@ sub ModeDetection
 		$Mode = 'global';
 	}
 	# If all else fails (not that it's a bad thing really) we use ~/.goldenpod
-	elsif(no $Mode)
+	elsif(not $Mode)
 	{
 		$Mode = 'global';
 	}
