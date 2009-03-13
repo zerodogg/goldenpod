@@ -7,6 +7,13 @@ ifndef prefix
 # user and for root. It will also succeed for distro installs as long as
 # prefix is set by the builder.
 prefix=$(shell perl -e 'if($$< == 0 or $$> == 0) { print "/usr" } else { print "$$ENV{HOME}/.local"}')
+
+# Some additional magic here, what it does is set BINDIR to ~/bin IF we're not
+# root AND ~/bin exists, if either of these checks fail, then it falls back to
+# the standard $(prefix)/bin. This is also inside ifndef prefix, so if a
+# prefix is supplied (for instance meaning this is a packaging), we won't run
+# this at all
+BINDIR ?= $(shell perl -e 'if(($$< > 0 && $$> > 0) and -e "$$ENV{HOME}/bin") { print "$$ENV{HOME}/bin";exit; } else { print "$(prefix)/bin"}')
 endif
 
 BINDIR ?= $(prefix)/bin
@@ -16,8 +23,6 @@ DATADIR ?= $(prefix)/share
 install:
 	mkdir -p "$(BINDIR)"
 	cp goldenpod "$(BINDIR)"
-	mkdir -p "$(DATADIR)"
-	cp -r art "$(DATADIR)/goldenpod"
 	chmod 755 "$(BINDIR)/goldenpod"
 localinstall:
 	mkdir -p "$(BINDIR)"
@@ -25,7 +30,7 @@ localinstall:
 	[  -e goldenpod.1 ] && mkdir -p "$(DATADIR)/man/man1" && ln -sf $(shell pwd)/goldenpod.1 "$(DATADIR)/man/man1" || true
 # Uninstall an installed goldenpod
 uninstall:
-	rm -f "$(BINDIR)/goldenpod" "$(BINDIR)/gpconf"
+	rm -f "$(BINDIR)/goldenpod" "$(BINDIR)/gpconf" "$(DATADIR)/man/man1/goldenpod.1"
 	rm -rf "$(DATADIR)/goldenpod"
 # Clean up the tree
 clean:
