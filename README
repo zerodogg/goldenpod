@@ -3,27 +3,26 @@ GoldenPod - a podcast client in perl
 -------------------------------------------------------------------------------
 
 GoldenPod is a podcast client (or podcast aggregator, or podcatcher, feel free
-to pick whichever name you want) written in perl. 
-It  supports  reading configuration files in ~/.goldenpod/ and then saving the
-podcasts to the directory defined there (by  default  ~/Podcasts/).  It
-also  supports  just  getting  thrown into a directory where BashPodder
-used to be and replacing it automagically, or having its  config  files
-in  the  same directory as itself and then just being run from a random
-location and detecting and performing a chdir correctly.   This,  along
-with  defaulting to silent mode, makes GoldenPod both cron-friendly and
-user-friendly.
+to pick whichever name you want) written in perl. It supports reading
+configuration files in ~/.goldenpod/ and then saving the podcasts to the
+directory defined there (by default ~/Podcasts/). It also supports just getting
+thrown into a directory where BashPodder used to be and replacing it
+automagically, or having its config files in the same directory as itself and
+then just being run from a random location and detecting and performing a chdir
+correctly. This, along with defaulting to silent mode, makes GoldenPod both
+cron-friendly and user-friendly.
 
-Information on how to configure goldenpod can be found in the manpage.
-If GoldenPod is installed globally on your system just type "man goldenpod"
-and the manpage will happily pop up and tell you what you need, if not
-then type "man ./goldenpod.1" in the directory containing the GoldenPod files
-and it'll (hopefully) pop happily up and (you guessed it) tell you what you
-want to know.
+Information on how to configure goldenpod can be found in the manpage. If
+GoldenPod is installed globally on your system just type "man goldenpod" and
+the manpage will happily pop up and tell you what you need, if not then type
+"man ./goldenpod.1" in the directory containing the GoldenPod files and it'll
+(hopefully) pop happily up and (you guessed it) tell you what you want to know.
 
-If you find any bugs or have any suggestions please do so on the project page
-at http://savannah.nongnu.org/projects/goldenpod
-If you just want to contact me, you can do so by mailing me at eskild [at]
-eskild [aat] zerodogg [dot] org.
+If you find any bugs or have any suggestions, please do so at
+http://random.zerodogg.org/goldenpod/bugs If you find any bugs or have any
+suggestions please do so on the project page at
+http://savannah.nongnu.org/projects/goldenpod If you just want to contact me,
+you can do so by mailing me at eskild [aat] zerodogg [dot] org.
 
 Thanks for using GoldenPod and hope it's useful.
 The author,
