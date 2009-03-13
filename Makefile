@@ -23,7 +23,7 @@ localinstall:
 	mkdir -p "$(BINDIR)"
 	ln -sf $(shell pwd)/goldenpod $(BINDIR)/
 	[  -e goldenpod.1 ] && mkdir -p "$(DATADIR)/man/man1" && ln -sf $(shell pwd)/goldenpod.1 "$(DATADIR)/man/man1" || true
-# Unisntall an installed goldenpod
+# Uninstall an installed goldenpod
 uninstall:
 	rm -f "$(BINDIR)/goldenpod" "$(BINDIR)/gpconf"
 	rm -rf "$(DATADIR)/goldenpod"
@@ -45,5 +45,6 @@ distrib: clean test man
 	mkdir -p goldenpod-$(VERSION)
 	cp -r ./`ls|grep -v goldenpod-$(VERSION)` ./goldenpod-$(VERSION)
 	rm -rf `find goldenpod-$(VERSION) -name \\.git`
+	rm -rf goldenpod-$(VERSION)/devel-tools
 	tar -jcvf goldenpod-$(VERSION).tar.bz2 ./goldenpod-$(VERSION)
 	rm -rf goldenpod-$(VERSION)
