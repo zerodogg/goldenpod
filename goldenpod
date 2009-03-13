@@ -1770,14 +1770,15 @@ B<goldenpod> [I<OPTIONS>]
 B<GoldenPod> is a podcast client (or podcast aggregator, or podcatcher, feel
 free to pick whichever name you want) written in perl.
 
-It supports reading configuration files in ~/.goldenpod/ and then saving the
-podcasts to the directory defined there (by default ~/Podcasts/). It also
-supports just getting thrown into a directory where BashPodder used to be and
-replacing it automagically, or having its config files in the same directory as
-itself and then just being run from a random location and detecting and
-performing a chdir correctly.  This, along with being able to run in silent
-mode by simply adding -s or changing the corresponding option in the
-configuration file makes GoldenPod both cron-friendly and user-friendly.
+It has two modes, the primary which is reading from configuration files in
+~/.goldenpod/ and then saving the podcasts to the directory defiend there (by
+default ~/Podcasts/). It also supports just getting thrown into a directory
+where BashPodder used to be and replacing it automagically, or having its
+config files in the same directory as itself and then just being run from a
+random location and detecting and performing a chdir correctly.  This, along
+with being able to run in silent mode by simply adding -s or changing the
+corresponding option in the configuration file makes GoldenPod both
+cron-friendly and user-friendly.
 
 =head1 ADDING PODCAST FEEDS TO GOLDENPOD
 
@@ -1790,7 +1791,7 @@ want B<goldenpod> to download you add the URL to the RSS feed on a line by its
 own to the podcasts configuration file. That is either one of
 I<~/.goldenpod/podcasts.conf>, I<./podcasts.conf> or I<./bp.conf>.  GoldenPod
 will first check for ./podcasts.conf, then ./bp.conf and lastly
-~/.goldenpod/podcasts.conf - it will never read more than one podcasts
+~/.goldenpod/podcasts.conf - it will never read more than one podcast
 configuration file.
 
 After adding you can simply run goldenpod to synchronize those feeds. The first
