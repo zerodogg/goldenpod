@@ -9,6 +9,7 @@ GoldenPod changelog
 - Added --clean
 - Added a Makefile
 - Added support for using LWP
+- Dropped GPConf, the focus is the commandline UI
 
 0.6
 - - - -
