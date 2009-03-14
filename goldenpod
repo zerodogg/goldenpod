@@ -50,13 +50,17 @@ my (
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config);
 
 # Version number
-my $Version = '0.7';			# My version
+my $Version = '0.7';
+# Our user agent string
 my $UserAgent = 'GoldenPod '.$Version.' (podcatcher)';
 
+# The global date, as used in directory names, value set in main()
 my $date;
 
+# The downloader
 my $downloader = 'LWP';
 
+# These are global state varibles for the LWP download component
 my $lastP = 0;
 my $prevLen = 0;
 my $LWP_InitialOut = 0;
