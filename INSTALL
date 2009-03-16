@@ -1,7 +1,7 @@
 Installation instructions for GoldenPod
 ---------------------------------------
 
-In order to install Day Planner simply run the command "make install" (without
+In order to install GoldenPod simply run the command "make install" (without
 the quotes) in the GoldenPod directory. You can do this as your user to install
 it locally for a single user, or as root to install it globally for all users.
 
