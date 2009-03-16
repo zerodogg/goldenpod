@@ -24,6 +24,7 @@ install:
 	mkdir -p "$(BINDIR)"
 	cp goldenpod "$(BINDIR)"
 	chmod 755 "$(BINDIR)/goldenpod"
+	[  -e goldenpod.1 ] && mkdir -p "$(DATADIR)/man/man1" && cp goldenpod.1 "$(DATADIR)/man/man1" || true
 localinstall:
 	mkdir -p "$(BINDIR)"
 	ln -sf $(shell pwd)/goldenpod $(BINDIR)/
