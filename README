@@ -2,6 +2,8 @@
 GoldenPod - a podcast client in perl
 -------------------------------------------------------------------------------
 
+For installation instructions see the INSTALL file.
+
 GoldenPod is a podcast client (or podcast aggregator, or podcatcher, feel free
 to pick whichever name you want) written in perl. It supports reading
 configuration files in ~/.goldenpod/ and then saving the podcasts to the
