@@ -10,6 +10,10 @@ GoldenPod changelog
 - Added a Makefile
 - Added support for using LWP
 - Dropped GPConf, the focus is the commandline UI
+- Added support for downloading podcasts that don't have proper
+	feeds, but only lists downloads on a webpage or in some
+	exotic format. See the manpage for the special syntax to use
+	this.
 
 0.6
 - - - -
