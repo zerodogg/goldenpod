@@ -1895,7 +1895,7 @@ B<GoldenPod> is a podcast client (or podcast aggregator, or podcatcher, feel
 free to pick whichever name you want) written in perl.
 
 It has two modes, the primary which is reading from configuration files in
-~/.goldenpod/ and then saving the podcasts to the directory defiend there (by
+~/.goldenpod/ and then saving the podcasts to the directory defined there (by
 default ~/Podcasts/). It also supports just getting thrown into a directory
 where BashPodder used to be and replacing it automagically, or having its
 config files in the same directory as itself and then just being run from a
@@ -1906,7 +1906,7 @@ cron-friendly and user-friendly.
 
 =head1 ADDING PODCAST FEEDS TO GOLDENPOD
 
-GoldenPod has two different configuration files. One is I<goldenpod.conf> the
+GoldenPod has two different configuration files. One is I<goldenpod.conf>, the
 other is the podcasts configuration file. The goldenpod.conf file should
 hopefully explain itself.
 
@@ -2086,7 +2086,7 @@ The directories created by this version will always be YYYY-MM-DD, while 0.1 to
 
 =head1 AUTHOR
 
-B<GoldenPod> is written by Eskild Hustvedt I<<zerodogg at skolelinux dot no>>
+B<GoldenPod> is written by Eskild Hustvedt I<<code aatt zerodogg d0t org>>
 
 =head1 FILES
 
