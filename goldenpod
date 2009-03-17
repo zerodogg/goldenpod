@@ -65,6 +65,8 @@ my $lastP = 0;
 my $prevLen = 0;
 my $LWP_InitialOut = 0;
 
+my $AudioRegex = '(ogg|mp3|m4a|wave?|flac|wmv|ape|tta|aac|mp2|mpa|ra|ram|aif|au|mpu)';
+
 # This makes sure children are slayed properly and their return values
 # are kept (in the %ReturnVals hash)
 $SIG{CHLD} = sub
@@ -1261,20 +1263,12 @@ sub Arg_Verbose
 # Download and feed functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-# Purpose: Parse a feed
-# Usage: my($URLs,$Title) = ParseFeed(FEED_CONTENTS);
-#  $Title can be undef. $URLs is an arrayref, can be empty.
-sub ParseFeed
+# Purpose: Get the title from a string
+# Usage: title = ParseTitle(FEED_CONTENTS);
+sub ParseTitle
 {
-	my $FeedContents = shift;
-	my $title;
-	my @URLs;
-	# We don't care about newlines
-	$FeedContents =~ s/\r?\n?//g;
-	
-	# Try to find the title of the podcast
-	my $FeedTitle;
-	my $ParseTitle = $FeedContents;
+	my $ParseTitle = shift;
+	my $FeedTitle = '';
 	chomp($ParseTitle);
 	foreach my $t (split(/</i,$ParseTitle))
 	{
@@ -1298,10 +1292,23 @@ sub ParseFeed
 		$FeedTitle =~ s/_+/_/g;
 		last;
 	}
-	if (not $FeedTitle)
-	{
-		$FeedTitle = '';
-	}
+	return $FeedTitle;
+}
+
+# Purpose: Parse a feed
+# Usage: my($URLs,$Title) = ParseFeed(FEED_CONTENTS);
+#  $Title can be undef. $URLs is an arrayref, can be empty.
+sub ParseFeed
+{
+	my $FeedContents = shift;
+	my $title;
+	my @URLs;
+	# We don't care about newlines
+	$FeedContents =~ s/\r?\n?/ /g;
+	
+	# Try to find the title of the podcast
+	my $FeedTitle = ParseTitle($FeedContents);
+
 	# Do the real parsing and add to @urls
 	# We want to extract all url='s
 	while(((my $CurrUrl = $FeedContents) =~ s/^.*url\s*=\s*[\"\']([^\"\']+)[\"\'].*$/$1/i))
@@ -1310,7 +1317,7 @@ sub ParseFeed
 		# Filter away non-audio feeds if the user wants it.
 		if ($Config{PodcastFilter})
 		{
-			next if not basename($CurrUrl) =~ /.*\.(ogg|mp3|m4a|wave?|flac|wmv|ape|tta|aac|mp2|mpa|ra|ram|aif|au|mpu).*/i;
+			next if not basename($CurrUrl) =~ /.*\.$AudioRegex.*/;
 		}
 		# Filter away stuff in $IgnorePattern
 		if ($IgnorePattern)
@@ -1324,6 +1331,31 @@ sub ParseFeed
 	# The current @URLs has the oldest first. Reverse it before returning it.
 	@URLs = reverse(@URLs);
 	return(\@URLs, $FeedTitle);
+}
+
+# Purpose: Fuzzy parse a feed
+# Usage: my($URLs,$Title) = FuzzyParseFeed(FEED_CONTENTS);
+sub FuzzyParseFeed
+{
+	my $FeedContents = shift;
+	my $match = shift;
+	my $title;
+	my @URLs;
+	
+	# Try to find the title of the podcast
+	my $FeedTitle = ParseTitle($FeedContents);
+	foreach my $e (split(/(\s+|<|>|\)|\(|"|')/,$FeedContents))
+	{
+		if (not $e =~ s#.*(http\S*)["']?.*#$1#g and not $e =~ s#.*["'](/\S+\.\S+)["'].*#$1#)
+		{
+			next;
+		}
+		next if not $e =~ /.*\.$AudioRegex.*/i;
+		next if not $e =~ /$match/;
+		chomp($e);
+		push(@URLs,$e);
+	}
+	return(\@URLs,$FeedTitle);
 }
 
 # Purpose: Download podcasts contained in the supplied array reference
@@ -1487,14 +1519,29 @@ sub FetchFeeds
 
 	# Open the configuration file for reading
 	open(my $CONFIG, '<', $PodcastList);
+	my $lineNo = 0;
 
 	# Read the configuration file and fetch feeds
 	while(my $podcast = <$CONFIG>)
 	{
+		$lineNo++;
 		chomp $podcast;
+		my $match;
 
 		# Ignore empty lines and lines starting with #
 		next if $podcast =~ /^\s*(#.*)?$/;
+
+		if ($podcast =~ m{^\s*/[^/]*[\\]?/.*})
+		{
+			($match = $podcast) =~ s{^\s*/([^/]*[^\\]?)/.*}{$1};
+			$podcast =~ s{^\s*/([^/]*[^\\]?)/\s*}{};
+			die("Error: Failed to extract regex\n") if not $match;
+			eval('my $v = ""; $v =~ /'.$match.'/; 1;');
+			if ($@)
+			{
+				die("Regex \"$match\" on line $lineNo in $PodcastList does not validate: $@\n");
+			}
+		}
 
 		printv("Fetching $podcast\n");
 
@@ -1507,8 +1554,16 @@ sub FetchFeeds
 		# Skip if we didn't recieve anything
 		next if not $Output;
 
+		my($URLs,$Title);
 		# Parse the feed and get the URLs. Skip the feed if we didn't get any.
-		my ($URLs, $Title) = ParseFeed($Output);
+		if (defined $match)
+		{
+			($URLs, $Title) = FuzzyParseFeed($Output,$match);
+		}
+		else
+		{
+			($URLs, $Title) = ParseFeed($Output);
+		}
 		next if(scalar(@{$URLs}) == 0);
 
 		# Push those URLs not already downloaded into @PodcastsAvailable,
@@ -1719,6 +1774,23 @@ GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 	'files|n=s' => \$FileNumber,
 	'delete|d' => \$CopyFiles_Delete,
 	'rmold|o' => \$RemoveOldFiles,
+	'fuzzydump=s' => sub {
+		shift; my $url = shift;
+		initDownload();
+		my $Output = fetchURL($url);
+		my ($URLs, $Title) = FuzzyParseFeed($Output,'.');
+		if (not @{$URLs})
+		{
+			print "Found no audio files\n";
+			exit(0);
+		}
+		print "Page is '$Title', found the following audio files:\n";
+		foreach my $f (@{$URLs})
+		{
+			print $f."\n";
+		}
+		exit(0);
+	},
 	
 	'silent|s' => sub
 	{ 
@@ -1790,17 +1862,27 @@ GoldenPod has two different configuration files. One is I<goldenpod.conf> the
 other is the podcasts configuration file. The goldenpod.conf file should
 hopefully explain itself.
 
-The syntax of the podcasts configuration file is simple; for each podcast you
-want B<goldenpod> to download you add the URL to the RSS feed on a line by its
-own to the podcasts configuration file. That is either one of
-I<~/.goldenpod/podcasts.conf>, I<./podcasts.conf> or I<./bp.conf>.  GoldenPod
-will first check for ./podcasts.conf, then ./bp.conf and lastly
-~/.goldenpod/podcasts.conf - it will never read more than one podcast
-configuration file.
+The basic syntax of the podcasts configuration file is simple; for each
+podcast you want B<goldenpod> to download you add the URL to the RSS feed
+on a line by its own to the podcasts configuration file (I<~/.goldenpod/podcasts.conf>
+by default, see the files section for alternate files).
 
-After adding you can simply run goldenpod to synchronize those feeds. The first
-time you run goldenpod to synchronize a feed you might want to use --first-only
-(see further down for more information about --first-only).
+GoldenPod can also download files contained in any XML, HTML or other
+text-based format. In this instance however it will only check audio
+files found on the page for download, and the configuration syntax is
+slightly different:
+
+	/REGEX/ URL
+
+This will download each URL linking to an audio file that GoldenPod finds in
+URL that matches /REGEX/. As GoldenPod already filters on audio files, you
+can simply make the regex /./ to download any audio file found. The regex
+can be any perl regular expression. See also I<--fuzzydump>.
+
+After adding your feeds you can simply run goldenpod to synchronize those
+feeds. The first time you run goldenpod to synchronize a feed you might want
+to use --first-only (see further down for more information about
+--first-only).
 
 I<Example podcasts.conf>
 
@@ -1819,8 +1901,9 @@ I<Example podcasts.conf>
 	# Jawbone radio
 	http://feeds.feedburner.com/JawboneRadio
 
-	# Infidelguy
-	http://www.infidelguy.com/infidelguy_shows.rss
+	# SOE podcast. Not using a feed, but extracted by GoldenPod from the
+	# HTML, locating any audio file matching the perl regex /96/
+	/96/ http://www.station.sony.com/en/podcasts.vm
 
 =head1 OPTIONS
 
@@ -1895,6 +1978,15 @@ your home directory (but all subdirectories except Documents) nor any files in
 =item B<-n, --files I<N>>
 
 For use with --copy or --rmold. Copy/delete N files instead of 4.
+
+=item B<--fuzzydump I<URL>>
+
+This uses the GoldenPod fuzzy parser to list audio files found in I<URL>.
+The fuzzy parser is the one invoked when using the "/REGEX/ URL" syntax
+in the podcasts.conf file (ie. to fetch podcasts from a non-RSS source).
+
+You can use this to see if GoldenPod finds anything in the URL, and
+to find out what your /REGEX/ for the URL should be.
 
 =item B<-o, --rmold>
 
