@@ -142,11 +142,13 @@ sub PrintHelp
 sub Help
 {
 	$PodcastLog =~ s/$ENV{HOME}/~/;
+	my $all = shift;
 	Version();
 	printf("\nUsage: %s", basename($0));
 	printf("\n  or : %s [OPTIONS]\n\n", basename($0));
 	PrintHelp('', '--version', 'Display version information and exit');
 	PrintHelp('-h', '--help', 'This help screen');
+	PrintHelp('-h', '--help-all', 'Print an extended help screen with additional options');
 	# Inform the user about the default based upon the value of $Config{DefaultVerbosity}
 	if ($Config{DefaultVerbosity})
 	{
@@ -159,7 +161,6 @@ sub Help
 		PrintHelp('-s', '--silent', 'Be silent (default)');
 	}
 	PrintHelp('', '--dumpinfo', 'Print the files goldenpod would work with');
-	PrintHelp('', '--prefer-curl', 'Prefer to use curl for downloading if available, instead of LWP (curl is used by default if LWP is missing)');
 	PrintHelp('', '--stats', 'Print some simple statistics');
 	PrintHelp('-l', '--nolog', 'Don\'t create a message logfile when in non-verbose mode.');
 	PrintHelp('-u', '--dry-run', 'Display what would be done but don\'t do it. Implies --verbose');
@@ -171,6 +172,11 @@ sub Help
 	PrintHelp('-o', '--rmold', 'Delete N old podcasts where N is 4 or the number supplied to --files');
 	PrintHelp('-i', '--ignore-pattern', 'Ignore filenames matching the regexp pattern supplied when downloading, copying or deleting podcasts.');
 	PrintHelp('','--clean','Clean up the podcasts directory and catalogue.');
+	if ($all)
+	{
+		PrintHelp('', '--prefer-curl', 'Prefer to use curl for downloading if available, instead of LWP (curl is used by default if LWP is missing)');
+		PrintHelp('', '--fuzzydump URL', 'Dump the list of files found by the fuzzy parser in URL. See the manpage for more information');
+	}
 }
 
 # Purpose: Print version and warranty information
@@ -1333,12 +1339,18 @@ sub ParseFeed
 	return(\@URLs, $FeedTitle);
 }
 
-# Purpose: Fuzzy parse a feed
+# Purpose: Fuzzy parse a feed. Gets audio URLs out of a non-RSS (ie. XML, HTML,
+# 	or any text format really) address
 # Usage: my($URLs,$Title) = FuzzyParseFeed(FEED_CONTENTS);
 sub FuzzyParseFeed
 {
 	my $FeedContents = shift;
 	my $match = shift;
+	my $URL = shift;
+	if(not $URL =~ s{^(\w+://[^/]+).*}{$1} or not $URL =~ s{^([^/]+).*}{$1})
+	{
+		$URL = undef;
+	}
 	my $title;
 	my @URLs;
 	
@@ -1353,6 +1365,14 @@ sub FuzzyParseFeed
 		next if not $e =~ /.*\.$AudioRegex.*/i;
 		next if not $e =~ /$match/;
 		chomp($e);
+		if ($e =~ m{^/} or not $e =~ m{/})
+		{
+			if(not $URL)
+			{
+				next;
+			}
+			$e = $URL.'/'.$e;
+		}
 		push(@URLs,$e);
 	}
 	return(\@URLs,$FeedTitle);
@@ -1558,7 +1578,7 @@ sub FetchFeeds
 		# Parse the feed and get the URLs. Skip the feed if we didn't get any.
 		if (defined $match)
 		{
-			($URLs, $Title) = FuzzyParseFeed($Output,$match);
+			($URLs, $Title) = FuzzyParseFeed($Output,$match,$podcast);
 		}
 		else
 		{
@@ -1759,9 +1779,11 @@ sub main
 ModeDetection();
 
 # Parse commandline arguments
-GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
+GetOptions (
+	'verbose|v' => sub {  Arg_Verbose() },
 	'version' => sub { Version(); exit 0},
 	'help|h' => sub { Help(); exit 0; },
+	'help-all' => sub { Help(1); exit 0; },
 	'no-download|nodownload|w' => sub { Arg_Verbose(); $NoDownload = 1 },
 	'dry-run|dryrun|u' => sub { Arg_Verbose(); $DryRun_Mode = 1},
 	'first-only|firstonly|first|f' => \$FirstOnly,
@@ -1778,7 +1800,7 @@ GetOptions ( 'verbose|v' => sub {  Arg_Verbose() },
 		shift; my $url = shift;
 		initDownload();
 		my $Output = fetchURL($url);
-		my ($URLs, $Title) = FuzzyParseFeed($Output,'.');
+		my ($URLs, $Title) = FuzzyParseFeed($Output,'.',$url);
 		if (not @{$URLs})
 		{
 			print "Found no audio files\n";
