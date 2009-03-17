@@ -1922,12 +1922,12 @@ slightly different:
 
 	/REGEX/ URL
 
-This will download each URL linking to an audio file that GoldenPod finds in
-URL that matches /REGEX/. As GoldenPod already filters on audio files, you
-can simply make the regex /./ to download any audio file found. The regex
-can be any perl regular expression. See also I<--fuzzydump>.
+This will download each audio file matching /REGEX/ that is mentioned in URL.
+As GoldenPod already filters on audio files, simply make the regex /./
+to download any audio file found. The regex can be any perl regular expression.
+See also I<--fuzzydump>.
 
-After adding your feeds you can simply run goldenpod to synchronize those
+After adding your feeds simply run goldenpod to synchronize those
 feeds. The first time you run goldenpod to synchronize a feed you might want
 to use --first-only (see further down for more information about
 --first-only).
