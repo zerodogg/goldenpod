@@ -1892,15 +1892,15 @@ B<goldenpod> [I<OPTIONS>]
 =head1 DESCRIPTION
 
 B<GoldenPod> is a podcast client (or podcast aggregator, or podcatcher, feel
-free to pick whichever name you want) written in perl.
+free to pick whichever name you want) written in perl. 
 
-It has two modes, the primary which is reading from configuration files in
-~/.goldenpod/ and then saving the podcasts to the directory defined there (by
-default ~/Podcasts/). It also supports just getting thrown into a directory
-where BashPodder used to be and replacing it automagically, or having its
-config files in the same directory as itself and then just being run from a
-random location and detecting and performing a chdir correctly.  This, along
-with being able to run in silent mode by simply adding -s or changing the
+It runs in either of two modes. The primary mode reads from configuration files
+in ~/.goldenpod, and saves podcasts to the directory defined there (by default
+~/Podcasts/) The other mode supports just getting thrown into a directory where
+BashPodder used to be and replacing it automagically, or having its config
+files in the same directory as itself and then just being run from a random
+location and detecting and performing a chdir correctly.  This, along with
+being able to run in silent mode by simply adding -s or changing the
 corresponding option in the configuration file makes GoldenPod both
 cron-friendly and user-friendly.
 
