@@ -65,7 +65,7 @@ my $lastP = 0;
 my $prevLen = 0;
 my $LWP_InitialOut = 0;
 
-my $AudioRegex = '(ogg|mp3|m4a|wave?|flac|wmv|ape|tta|aac|mp2|mpa|ra|ram|aif|au|mpu)';
+my $AudioRegex = '(ogg|oga|mp3|m4a|wave?|flac|wma|ape|tta|aac|mp2|mpa|ram?|aiff?|au|mpu)';
 
 # This makes sure children are slayed properly and their return values
 # are kept (in the %ReturnVals hash)
