@@ -2077,7 +2077,9 @@ Besides from perl it requires either LWP (preferred) or curl.
 
 This version of GoldenPod uses a new configuration syntax that is not backwards
 compatible with GoldenPod versions 0.1 to 0.6 (however it can upgrade the old
-configuration syntax to the new one).
+configuration syntax to the new one). It also has support for fuzzy parsing
+(the "/REGEX/ URL" syntax), older versions of GoldenPod is not able to read
+those entries.
 
 The directories created by this version will always be YYYY-MM-DD, while 0.1 to
 0.6 could be YYYY-MM-D.
