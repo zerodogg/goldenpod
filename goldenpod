@@ -1971,8 +1971,8 @@ Be silent.
 
 =item B<-l, --nolog>
 
-Don't create a message logfile when in non-verbose mode.  Has no use with
-B<--verbose>
+Don't create a message logfile when in non-verbose mode. No effect unless in
+B<--silent> mode.
 
 =item B<--prefer-curl>
 
