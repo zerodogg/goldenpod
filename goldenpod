@@ -1346,7 +1346,8 @@ sub FuzzyParseFeed
 {
 	my $FeedContents = shift;
 	my $match = shift;
-	my $URL = shift;
+	my $fullURL = shift;
+	my $URL = $fullURL;
 	if(not $URL =~ s{^(\w+://[^/]+).*}{$1} or not $URL =~ s{^([^/]+).*}{$1})
 	{
 		$URL = undef;
@@ -1356,23 +1357,48 @@ sub FuzzyParseFeed
 	
 	# Try to find the title of the podcast
 	my $FeedTitle = ParseTitle($FeedContents);
+	
+	# Do some elaborate fuzzy parsing of the content
 	foreach my $e (split(/(\s+|<|>|\)|\(|"|')/,$FeedContents))
 	{
-		if (not $e =~ s#.*(http\S*)["']?.*#$1#g and not $e =~ s#.*["'](/\S+\.\S+)["'].*#$1#)
+		# Get https?:// or /blah/blah URLs
+		if (not $e =~ s#.*(https?\S*)["']?.*#$1#g and not $e =~ s#.*["'](/\S+\.\S+)["'].*#$1#)
 		{
 			next;
 		}
+		# Only audio URLs
 		next if not $e =~ /.*\.$AudioRegex.*/i;
+		# Only stuff matching
 		next if not $e =~ /$match/;
 		chomp($e);
+		
+		# If it's a relative URL, do some additional processing
 		if ($e =~ m{^/} or not $e =~ m{/})
 		{
+			# No URL? Then we can't handle it
 			if(not $URL)
 			{
 				next;
 			}
-			$e = $URL.'/'.$e;
+			# If fulLURL ends with / use that
+			if ($fullURL =~ m{/$})
+			{
+				$e = $fullURL.$e;
+			}
+			# If there's .. then try fullURL
+			elsif($e =~ m{^/?\.\.} )
+			{
+				my $u = $fullURL;
+				$u =~ s{[^/]+$};
+				$e = $u.$e;
+			}
+			else
+			{
+				# fall back to URL/e
+				$e = $URL.'/'.$e;
+			}
 		}
+		# Done, add it to the list
 		push(@URLs,$e);
 	}
 	return(\@URLs,$FeedTitle);
