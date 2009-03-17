@@ -1,6 +1,6 @@
 # GoldenPod makefile
 
-VERSION=0.7
+VERSION=$(shell ./goldenpod --version|perl -pi -e 's/^\D+//; chomp')
 
 ifndef prefix
 # This little trick ensures that make install will succeed both for a local
