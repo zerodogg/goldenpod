@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# GoldenPod version 0.8
+# GoldenPod
 # Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009
 #
 # This program is free software: you can redistribute it and/or modify
@@ -50,7 +50,7 @@ my (
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config);
 
 # Version number
-my $Version = '0.8';
+my $Version = '0.7.1';
 # Our user agent string
 my $UserAgent = 'GoldenPod '.$Version.' (podcatcher)';
 
@@ -1018,7 +1018,6 @@ sub WriteConfigFile
 		print $CONFIG "# $Explanations->{HEADER}\n";
 	}
 	foreach(sort(keys(%{$Config}))) {
-		next if not length($Config->{$_});	# Don't write empty options
 		if(defined($Explanations->{$_})) {
 			print $CONFIG "\n# $Explanations->{$_}";
 		}
@@ -1047,8 +1046,8 @@ sub LoadConfigFile
 		chomp;
 		my $Option = $_;
 		my $Value = $_;
-		$Option =~ s/^\s*(\w+)\s*=.*/$1/;
-		$Value =~ s/^\s*\w+\s*=\s*(.*)\s*/$1/;
+		$Option =~ s/^\s*(\S+)\s*=.*/$1/;
+		$Value =~ s/^\s*\S+\s*=\s*(.*)\s*/$1/;
 		if($OnlyValidOptions) {
 			unless(defined($OptionRegex->{$Option})) {
 				warn("Unknown configuration option \"$Option\" (=$Value) in $File: Ignored.");
@@ -1081,10 +1080,10 @@ sub InitGlobalConfig
 	}
 	my %OptionRegexHash = (
 			# Old-style (pre 0.7) settings
-			'$WorkingDir ' => '.',
-			'$DefaultVerbosity ' => '.',
-			'$IgnorePattern ' => '.',
-			'$PodcastFilter ' => '.',
+			'$WorkingDir' => '.',
+			'$DefaultVerbosity' => '.',
+			'$IgnorePattern' => '.',
+			'$PodcastFilter' => '.',
 
 			# New-style 0.7+
 			# TODO: At some point accept true/TRUE/false/FALSE/yes/YES/no/NO/1/0 instead of just 1/0
@@ -1093,16 +1092,16 @@ sub InitGlobalConfig
 			PodcastFilter => '0|1',
 		);
 
-	LoadConfigFile("$UserConfigDir/goldenpod.conf", \%Config, \%OptionRegexHash);
-	if(defined($Config{'$WorkingDir '}))
+	LoadConfigFile($UserConfigDir.'/goldenpod.conf', \%Config, \%OptionRegexHash);
+	if(defined($Config{'$WorkingDir'}))
 	{
 		print 'Migrating old configuration format...';
-		foreach (qw#$WorkingDir $DefaultVerbosity $IgnorePattern $PodcastFilter#) {
+		foreach (qw#$WorkingDir $DefaultVerbosity $IgnorePattern $PodcastFilter#)
+		{
 			my $OptName = $_;
 			print '.';
-			$OptName = "$OptName ";
 			my $Opt = $Config{$OptName};
-			$Opt =~ s/^\"(.*)\";?$/$1/;
+			$Opt =~ s/^\"(.*)\"\s*;?$/$1/;
 			delete($Config{$OptName});
 			$OptName =~ s/^\$(\w+)\s*/$1/;
 			$Config{$OptName} = $Opt;
@@ -1139,7 +1138,7 @@ sub WriteGPConfig
 		HEADER => "GoldenPod configuration file\n# DO NOT put feed URLs in this file. Those go in podcasts.conf",
 	);
 	# Write the actual file
-	WriteConfigFile("$UserConfigDir/goldenpod.conf", \%Config, \%Explanations);
+	WriteConfigFile($UserConfigDir.'/goldenpod.conf', \%Config, \%Explanations);
 }
 
 # Purpose: Creates ~/.goldenpod or another $UserConfigDir
@@ -1214,6 +1213,12 @@ sub ModeDetection
 	else
 	{
 		$ConfigDir = $UserConfigDir;
+	}
+
+	if(not defined $Config{WorkingDir})
+	{
+		$Config{WorkingDir} = $ENV{HOME}.'/Podcasts';
+		warn('Failed to locate WorkingDir, falling back to '.$Config{WorkingDir});
 	}
 
 	# Do base initialization
