@@ -1,5 +1,10 @@
 GoldenPod changelog
 
+0.7.1
+- - - -
+- Fixed a bug that caused GoldenPod to fail to upgrade configuration
+	files from 0.6 and older to the new 0.7+ format.
+
 0.7
 - - - -
 - Fixed handling of the catalogue when deleting files
