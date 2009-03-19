@@ -1359,6 +1359,8 @@ sub FuzzyParseFeed
 	}
 	my $title;
 	my @URLs;
+	# This is used to avoid dupes in @URLs
+	my %URLList;
 	
 	# Try to find the title of the podcast
 	my $FeedTitle = ParseTitle($FeedContents);
@@ -1366,8 +1368,15 @@ sub FuzzyParseFeed
 	# Do some elaborate fuzzy parsing of the content
 	foreach my $e (split(/(\s+|<|>|\)|\(|"|')/,$FeedContents))
 	{
-		# Get https?:// or /blah/blah URLs
-		if (not $e =~ s#.*(https?\S*)["']?.*#$1#g and not $e =~ s#.*["'](/\S+\.\S+)["'].*#$1#)
+		# Get URLs
+		if (
+			# This one extracts URLs not containing whitespace and \"'
+			not $e =~ s#.*(https?[^\\"'\s]+)["']?.*#$1#g and
+			# The same as above, but allows "'
+			not $e =~ s#.*(https?\S*)["']?.*#$1#g and
+			# /something/... - ie. without domain and http://
+			not $e =~ s#.*["'](/\S+\.\S+)["'].*#$1#
+		)
 		{
 			next;
 		}
@@ -1404,7 +1413,11 @@ sub FuzzyParseFeed
 			}
 		}
 		# Done, add it to the list
-		push(@URLs,$e);
+		if(not $URLList{$e})
+		{
+			push(@URLs,$e);
+			$URLList{$e} = 1;
+		}
 	}
 	return(\@URLs,$FeedTitle);
 }
