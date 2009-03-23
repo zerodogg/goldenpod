@@ -50,7 +50,7 @@ my (
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config);
 
 # Version number
-my $Version = '0.7.1';
+my $Version = '0.7.2';
 # Our user agent string
 my $UserAgent = 'GoldenPod '.$Version.' (podcatcher)';
 
@@ -1901,7 +1901,7 @@ __END__
 
 =head1 NAME
 
-goldenpod - a podcast client written in perl
+goldenpod - a command-line podcast client written in perl
 
 =head1 SYNOPSIS
 
@@ -1909,8 +1909,8 @@ B<goldenpod> [I<OPTIONS>]
 
 =head1 DESCRIPTION
 
-B<GoldenPod> is a podcast client (or podcast aggregator, or podcatcher, feel
-free to pick whichever name you want) written in perl. 
+B<GoldenPod> is a command-line podcast client (or podcast aggregator, or
+podcatcher, feel free to pick whichever name you want) written in perl. 
 
 It runs in either of two modes. The primary mode reads from configuration files
 in ~/.goldenpod, and saves podcasts to the directory defined there (by default
