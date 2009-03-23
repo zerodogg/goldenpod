@@ -1,5 +1,9 @@
 GoldenPod changelog
 
+0.8
+- - - -
+- Made the default output more informative
+
 0.7.1
 - - - -
 - Fixed a bug that caused GoldenPod to fail to upgrade configuration
