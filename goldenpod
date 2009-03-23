@@ -1426,13 +1426,14 @@ sub DownloadPodcasts
 	{
 		print "\n";
 	}
+	print "Found a total of ";
 	if ($NeedToDownload > 1)
 	{
-		print "$NeedToDownload new podcasts.\n\n";
+		print "$NeedToDownload new podcasts to download.\n\n";
 	}
 	elsif($NeedToDownload == 1)
 	{
-		print "$NeedToDownload new podcast.\n\n";
+		print "$NeedToDownload new podcast to download.\n\n";
 	}
 
 	# Open the logfile for writing
@@ -1443,7 +1444,7 @@ sub DownloadPodcasts
 	{
 		if (not $DryRun_Mode)
 		{
-			print "Downloading $URL\n";
+			print "Downloading $URL\n" if not $Verbose;
 			# Curl returns nonzero on failure
 			my $DownloadStatus = DownloadURL($Config{WorkingDir}.'/'.$date, $URL);
 			if($DownloadStatus)
@@ -1646,7 +1647,15 @@ sub FetchFeeds
 			}
 		}
 		push(@FirstOnly, ${$URLs}[0]) if $newP;
-		print $newP." new podcasts found\n";
+		if ($newP == 0)
+		{
+			print "No new podcasts found\n";
+		}
+		else
+		{
+			my $podcast = $newP == 1 ? 'podcast' : 'podcasts';
+			print $newP." new $podcast found\n";
+		}
 	}
 
 	# Close the configuration file
