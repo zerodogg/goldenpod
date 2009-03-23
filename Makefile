@@ -36,7 +36,7 @@ uninstall:
 # Clean up the tree
 clean:
 	rm -f `find|egrep '~$$'`
-	rm -f goldenpod-$(VERSION).tar.bz2
+	rm -f goldenpod-*.tar.bz2
 	rm -rf goldenpod-$(VERSION)
 	rm -f goldenpod.1
 # Verify syntax
