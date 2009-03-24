@@ -271,6 +271,7 @@ sub fetchURL
 		# initDownload();
 		my $UA = GPLWP->new(
 			agent => $UserAgent.' libwwwperl',
+			requests_redirectable => [ 'GET', 'HEAD' ],
 		);
 		my $response;
 
@@ -1307,7 +1308,7 @@ sub ParseFeed
 	my $title;
 	my @URLs;
 	# We don't care about newlines
-	$FeedContents =~ s/\r?\n?/ /g;
+	$FeedContents =~ s/(\r\n|\r|\n)/ /g;
 	
 	# Try to find the title of the podcast
 	my $FeedTitle = ParseTitle($FeedContents);
@@ -1649,7 +1650,14 @@ sub FetchFeeds
 		push(@FirstOnly, ${$URLs}[0]) if $newP;
 		if ($newP == 0)
 		{
-			print "No new podcasts found\n";
+			if(scalar(@{$URLs}) > 0)
+			{
+				printv("No new podcasts found.\n");
+			}
+			else
+			{
+				printv("No podcasts found in feed.\n");
+			}
 		}
 		else
 		{

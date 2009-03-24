@@ -3,6 +3,7 @@ GoldenPod changelog
 0.8
 - - - -
 - Made the default output more informative
+- Fixed a bug causing some feeds to fail to parse
 
 0.7.1
 - - - -
