@@ -1411,6 +1411,12 @@ sub addFeed
 			die("The pattern \"$pattern\" does not validate: $@\n");
 		}
 	}
+	if(not $feed =~ m{^(http|ftp)})
+	{
+		print "Warning: This does not look like a feed URL, adding anyway.\n";
+		print "If you did not intend to add it, use this command to remove it:\n";
+		print "  goldenpod --remove \"$feed\"\n\n";
+	}
 	my $feeds = ParseList();
 	push(@{$feeds}, {
 			podcast => $feed,
