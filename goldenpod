@@ -1267,6 +1267,87 @@ sub Arg_Verbose
 # Download and feed functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+# Purpose: Parse the podcasts.conf file
+# Usage: my $confArray = ParseList();
+sub ParseList
+{
+	# Open the configuration file for reading
+	open(my $CONFIG, '<', $PodcastList);
+	my $lineNo = 0;
+	my @currentComments;
+	my @list;
+
+	# Read the configuration file and fetch feeds
+	while(my $podcast = <$CONFIG>)
+	{
+		$lineNo++;
+		chomp $podcast;
+		my $match;
+
+		if ($podcast =~ /^\s*#.*/)
+		{
+			push(@currentComments,$podcast);
+			next;
+		}
+		elsif($podcast =~ /^\s*$/)
+		{
+			undef @currentComments;
+			next;
+		}
+		my $hash = {
+			comments => [@currentComments],
+		};
+		@currentComments = ();
+
+		if ($podcast =~ m{^\s*/[^/]*[\\]?/.*})
+		{
+			($match = $podcast) =~ s{^\s*/([^/]*[^\\]?)/.*}{$1};
+			$podcast =~ s{^\s*/([^/]*[^\\]?)/\s*}{};
+			die("Error: Failed to extract regex\n") if not $match;
+			eval('my $v = ""; $v =~ /'.$match.'/; 1;');
+			if ($@)
+			{
+				die("Regex \"$match\" on line $lineNo in $PodcastList does not validate: $@\n");
+			}
+		}
+		$hash->{podcast} = $podcast;
+		$hash->{match} = $match;
+		$hash->{lineNo} = $lineNo;
+		push(@list,$hash);
+	}
+	return \@list;
+}
+
+# Purpose: Write the podcasts.conf file
+# Usage: WriteList($confArray);
+sub WriteList
+{
+	my $list = shift;
+	return if not $list;
+	open(my $CONFIG, '>', $PodcastList);
+	print $CONFIG '# GoldenPod podcast list. Last written: '.scalar(localtime)."\n";
+	print $CONFIG "# Put your podcast feed URLs in this file seperated by newlines\n";
+	print $CONFIG "# All lines starting with # are ignored\n";
+	foreach my $e (@{$list})
+	{
+		print $CONFIG "\n";
+		foreach my $c (@{$e->{comments}})
+		{
+			print $CONFIG $c."\n";
+		}
+
+		if ($e->{match})
+		{
+			print $CONFIG '/'.$e->{match}.'/ '.$e->{podcast}."\n";
+		}
+		else
+		{
+			print $CONFIG $e->{podcast}."\n";
+		}
+	}
+	close($CONFIG);
+}
+
 # Purpose: Get the title from a string
 # Usage: title = ParseTitle(FEED_CONTENTS);
 sub ParseTitle
@@ -1563,9 +1644,6 @@ sub CreateCatalogue
 # Usage: FetchFeeds();
 sub FetchFeeds
 {
-	# Is the config file empty?
-	my $ConfIsNotEmpty = 0;
-
 	# The list of podcasts to download
 	my @DownloadQueue;
 
@@ -1588,33 +1666,13 @@ sub FetchFeeds
 	}
 
 	# Open the configuration file for reading
-	open(my $CONFIG, '<', $PodcastList);
-	my $lineNo = 0;
+	my $config = ParseList();
 
 	# Read the configuration file and fetch feeds
-	while(my $podcast = <$CONFIG>)
+	foreach my $entry (@{$config})
 	{
-		$lineNo++;
-		chomp $podcast;
-		my $match;
-
-		# Ignore empty lines and lines starting with #
-		next if $podcast =~ /^\s*(#.*)?$/;
-
-		if ($podcast =~ m{^\s*/[^/]*[\\]?/.*})
-		{
-			($match = $podcast) =~ s{^\s*/([^/]*[^\\]?)/.*}{$1};
-			$podcast =~ s{^\s*/([^/]*[^\\]?)/\s*}{};
-			die("Error: Failed to extract regex\n") if not $match;
-			eval('my $v = ""; $v =~ /'.$match.'/; 1;');
-			if ($@)
-			{
-				die("Regex \"$match\" on line $lineNo in $PodcastList does not validate: $@\n");
-			}
-		}
-
-		# Make a note about the config not being empty
-		$ConfIsNotEmpty = 1;
+		my $podcast = $entry->{podcast};
+		my $match = $entry->{match};
 
 		# Download data
 		my $Output = fetchURL($podcast);
@@ -1666,11 +1724,8 @@ sub FetchFeeds
 		}
 	}
 
-	# Close the configuration file
-	close $CONFIG;
-
 	# If the config is empty, die.	
-	if (not $ConfIsNotEmpty)
+	if (not scalar(@{$config}))
 	{
 		die "The podcast list in $PodcastList is empty, nothing to do.\n";
 	}
