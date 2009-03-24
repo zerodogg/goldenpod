@@ -4,6 +4,8 @@ GoldenPod changelog
 - - - -
 - Made the default output more informative
 - Fixed a bug causing some feeds to fail to parse
+- Added --add, --list and --remove to add/list/remove feeds
+	from the command-line
 
 0.7.1
 - - - -

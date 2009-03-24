@@ -159,9 +159,10 @@ sub Help
 		PrintHelp('-v', '--verbose', 'Be verbose');
 		PrintHelp('-s', '--silent', 'Be silent (default)');
 	}
-	PrintHelp('', '--dumpinfo', 'Print the files goldenpod would work with');
+	PrintHelp('', '--list', 'Print the list of podcasts added to goldenpod');
+	PrintHelp('-a', '--add [URL]', 'Add the URL specified as a feed in goldenpod. You may optionally supply a second parameter, which makes the feed use the fuzzy parser with the regular expression supplied.');
+	PrintHelp('-r', '--remove [URL]', 'Remove the URL specified from goldenpod\'s feed list.');
 	PrintHelp('', '--stats', 'Print some simple statistics');
-	PrintHelp('-l', '--nolog', 'Don\'t create a message logfile when in non-verbose mode.');
 	PrintHelp('-u', '--dry-run', 'Display what would be done but don\'t do it. Implies --verbose');
 	PrintHelp('-w', '--no-download','Mark all podcasts as downloaded. Implies --verbose.');
 	PrintHelp('-f', '--first-only', 'Only download the first file in any feed. Permanently ignore the others.');
@@ -173,6 +174,8 @@ sub Help
 	PrintHelp('','--clean','Clean up the podcasts directory and catalogue.');
 	if ($all)
 	{
+		PrintHelp('', '--dumpinfo', 'Print the files goldenpod would work with');
+		PrintHelp('-l', '--nolog', 'Don\'t create a message logfile when in silent mode.');
 		PrintHelp('', '--prefer-curl', 'Prefer to use curl for downloading if available, instead of LWP (curl is used by default if LWP is missing)');
 		PrintHelp('', '--fuzzydump URL', 'Dump the list of files found by the fuzzy parser in URL. See the manpage for more information');
 	}
@@ -1263,10 +1266,6 @@ sub Arg_Verbose
 	}
 }
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Download and feed functions
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
 # Purpose: Parse the podcasts.conf file
 # Usage: my $confArray = ParseList();
 sub ParseList
@@ -1330,6 +1329,7 @@ sub WriteList
 	print $CONFIG "# All lines starting with # are ignored\n";
 	foreach my $e (@{$list})
 	{
+		next if not defined $e;
 		print $CONFIG "\n";
 		foreach my $c (@{$e->{comments}})
 		{
@@ -1347,6 +1347,123 @@ sub WriteList
 	}
 	close($CONFIG);
 }
+
+# Purpose: Handle --list to list feeds
+# Usage: \&listFeeds in GetOptions
+sub listFeeds
+{
+	print "\n";
+	my @normalFeeds;
+	my @fuzzyFeeds;
+	my $feeds = ParseList();
+	if(not @{$feeds})
+	{
+		die("You have no feeds added to GoldenPod\n");
+	}
+
+	foreach my $feed (@{$feeds})
+	{
+		if ($feed->{match})
+		{
+			push(@fuzzyFeeds,$feed);
+		}
+		else
+		{
+			push(@normalFeeds,$feed);
+		}
+	}
+
+	if (@normalFeeds)
+	{
+		print "You have the following standard podcast feeds:\n";
+		foreach my $feed (@normalFeeds)
+		{
+			print $feed->{podcast}."\n";
+		}
+	}
+	if (@fuzzyFeeds)
+	{
+		print "\n" if (@normalFeeds);
+		print "You have the following podcasts using the fuzzy parser:\n";
+		my $format = '%-20s %s'."\n";
+		printf($format,'Regex:','URL:');
+		foreach my $feed (@fuzzyFeeds)
+		{
+			printf($format,'/'.$feed->{match}.'/',$feed->{podcast});
+		}
+	}
+	exit(0);
+}
+
+# Purpose: Handle --addfeed to add a feed
+# Usage: \&addFeed in GetOptions
+sub addFeed
+{
+	shift;
+	my $feed = shift;
+	my $pattern;
+	if (@ARGV)
+	{
+		$pattern = shift(@ARGV);
+		$pattern =~ s{^\s*/(.*)/\s*}{$1};
+		if(not eval('my $n = ""; $n =~ /'.$pattern.'/; 1;'))
+		{
+			die("The pattern \"$pattern\" does not validate: $@\n");
+		}
+	}
+	my $feeds = ParseList();
+	push(@{$feeds}, {
+			podcast => $feed,
+			match => $pattern,
+			comments => ['# Added: '.scalar(localtime)],
+		});
+	WriteList($feeds);
+
+	if ($pattern)
+	{
+		print "Added the fuzzy feed \"$feed\" with the regex pattern /$pattern/.\n";
+	}
+	else
+	{
+		print "Added the feed $feed\n";
+	}
+	exit(0);
+}
+
+# Purpose: Handle --removefeed to remove a feed
+# Usage: \&removeFeed in GetOptions
+sub removeFeed
+{
+	shift;
+	my $feed = shift;
+	my $feeds = ParseList();
+	my $removed = 0;
+	for my $n (0..@{$feeds})
+	{
+		my $thisfeed = $feeds->[$n];
+		next if not defined $thisfeed or not defined $thisfeed->{podcast};
+		if ($feed eq $thisfeed->{podcast})
+		{
+			@{$feeds}[$n] = undef;
+			$removed = 1;
+		}
+	}
+	WriteList($feeds);
+	if ($removed)
+	{
+		print "Removed the feed \"$feed\".\n";
+	}
+	else
+	{
+		print "The feed \"$feed\" was not found.\n";
+		exit(1);
+	}
+	exit(0);
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Download and feed functions
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 # Purpose: Get the title from a string
 # Usage: title = ParseTitle(FEED_CONTENTS);
@@ -1881,6 +1998,9 @@ GetOptions (
 		CleanupDirs();
 		exit(0);
 	},
+	't|list|listfeeds' => \&listFeeds,
+	'a|add|addfeed=s' => \&addFeed,
+	'r|remove|rmfeed|removefeed=s' => \&removeFeed,
 	'files|n=s' => \$FileNumber,
 	'delete|d' => \$CopyFiles_Delete,
 	'rmold|o' => \$RemoveOldFiles,
@@ -1966,54 +2086,43 @@ being able to run in silent mode by simply adding -s or changing the
 corresponding option in the configuration file makes GoldenPod both
 cron-friendly and user-friendly.
 
-=head1 ADDING PODCAST FEEDS TO GOLDENPOD
+=head1 BASIC USE
 
-GoldenPod has two different configuration files. One is I<goldenpod.conf>, the
-other is the podcasts configuration file. The goldenpod.conf file should
-hopefully explain itself.
+=head2 Adding feeds
 
-The basic syntax of the podcasts configuration file is simple; for each
-podcast you want B<goldenpod> to download you add the URL to the RSS feed
-on a line by its own to the podcasts configuration file (I<~/.goldenpod/podcasts.conf>
-by default, see the files section for alternate files).
+Adding podcast feeds to goldenpod is simple. Just run:
 
-GoldenPod can also download files contained in any XML, HTML or other
-text-based format. In this instance however it will only check audio
-files found on the page for download, and the configuration syntax is
-slightly different:
+	goldenpod --add [URL]
 
-	/REGEX/ URL
+And the URL supplied is added to goldenpod, and it will download podcasts
+from it the next time it is started.
 
-This will download each audio file matching /REGEX/ that is mentioned in URL.
-As GoldenPod already filters on audio files, simply make the regex /./
-to download any audio file found. The regex can be any perl regular expression.
-See also I<--fuzzydump>.
+If the podcast does not have a proper feed, you can try to use the
+goldenpod fuzzy parser (see the PARSERS section further down for information
+about it). The syntax for that is:
 
-After adding your feeds simply run goldenpod to synchronize those
-feeds. The first time you run goldenpod to synchronize a feed you might want
-to use --first-only (see further down for more information about
---first-only).
+	goldenpod --add [URL] /REGEX/
 
-I<Example podcasts.conf>
+=head2 Removing feeds
 
-	# Put your podcast feed URLs in this file seperated by newlines
-	# All lines starting with # are ignored
+Removing a feed is just like --add, use:
 
-	# Paranormal podcast
-	http://paranormalpodcast.libsyn.com/rss
+	goldenpod --remove [URL]
 
-	# Perlcast (perl related podcast)
-	http://www.perlcast.com/rss/current.xml
+This will remove all feeds (no matter which parser is used) at the URL
+supplied.
 
-	# LUG Radio
-	http://www.lugradio.org/episodes.rss
+=head2 Listing feeds
 
-	# Jawbone radio
-	http://feeds.feedburner.com/JawboneRadio
+To get a list of all the feeds you have added, along with which parser
+they are using, run:
 
-	# SOE podcast. Not using a feed, but extracted by GoldenPod from the
-	# HTML, locating any audio file matching the perl regex /96/
-	/96/ http://www.station.sony.com/en/podcasts.vm
+	goldenpod --list
+
+=head2 Downloading podcasts
+
+To download podcasts from the feeds you have added, run goldenpod without
+any parameters.
 
 =head1 OPTIONS
 
@@ -2035,6 +2144,22 @@ Be silent.
 
 Don't create a message logfile when in non-verbose mode. No effect unless in
 B<--silent> mode.
+
+=item B<-a, --add, --addfeed I<FEED> (I<REGEX>) > 
+
+Add the feed URL supplied to goldenpod's feed list. Optionally you may supply
+a second parameter to this option, a regular expression. If this is present
+then the feed will be added to use the fuzzy parser (see the PARSERS section)
+with that regular expression.
+
+=item B<-r, --remove, --removefeed, --rmfeed I<FEED> >
+
+Removes the feed URL supplied from goldenpod's feed list.
+
+=item B<-t, --list, --listfeeds>
+
+Prints a list of feeds in goldenpod, along with which parser the feeds are
+using.
 
 =item B<--prefer-curl>
 
@@ -2126,6 +2251,55 @@ the catalogue and rewrite playlists. This is also done after --rmold.
 
 =back
 
+=head1 PARSERS
+
+GoldenPod comes with two different feed parsers.
+
+=head2 STANDARD/RSS PARSER
+
+This is the default parser. It parses any standard RSS feed used by podcasts.
+This is the most commonly used parser, and is preferred whenever possible.
+This is used unless the fuzzy parser is explicitly requested.
+
+=head2 FUZZY PARSER
+
+This is a much more liberal parser. It searches for URL-like strings in any
+document that matches a set regular expression, allowing you to subscribe
+to podcasts that does not have their own feed, or to subscribe to
+audio-files found on a page regulary for download. This parser
+allows you to subscribe to sites that has the links to the audio
+files in a HTML, XML or other text-based format.
+
+It has limitations however, it only finds audio files and it requires a regular
+expression. It will only download files that match the regular expression that
+you supply to it (if you want it to download all audio files it finds, make the
+regular expression a single "." (without the quotes) to make it match them all).
+
+To use the fuzzy parser, supply a regular expression as the second parameter
+to I<--add> (or, if you edit the podcasts.conf file by hand, use the "/regex/
+URL" syntax).
+
+=head1 EXAMPLE podcasts.conf
+
+	# Put your podcast feed URLs in this file seperated by newlines
+	# All lines starting with # are ignored
+
+	# Paranormal podcast
+	http://paranormalpodcast.libsyn.com/rss
+
+	# Perlcast (perl related podcast)
+	http://www.perlcast.com/rss/current.xml
+
+	# LUG Radio
+	http://www.lugradio.org/episodes.rss
+
+	# Jawbone radio
+	http://feeds.feedburner.com/JawboneRadio
+
+	# SOE podcast. Not using a feed, but extracted by GoldenPod from the
+	# HTML, locating any audio file matching the perl regex /96/
+	/96/ http://www.station.sony.com/en/podcasts.vm
+
 =head1 HELP/SUPPORT
 
 If you need additional help, please visit the website at
@@ -2139,12 +2313,12 @@ Besides from perl it requires either LWP (preferred) or curl.
 
 This version of GoldenPod uses a new configuration syntax that is not backwards
 compatible with GoldenPod versions 0.1 to 0.6 (however it can upgrade the old
-configuration syntax to the new one). It also has support for fuzzy parsing
-(the "/REGEX/ URL" syntax), older versions of GoldenPod is not able to read
-those entries.
+configuration syntax to the new one). 0.6 and older also did not have support
+for fuzzy parsing (the "/REGEX/ URL" syntax) and will fail to download those
+entries.
 
 The directories created by this version will always be YYYY-MM-DD, while 0.1 to
-0.6 could be YYYY-MM-D.
+0.6 could be YYYY-M-D.
 
 =head1 AUTHOR
 

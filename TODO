@@ -1,13 +1,7 @@
-TODO for 0.8:
+TODO for 0.9:
 - Add a new logfile algorithm (this to take advantage of perl more than
 	it is currently. It will break bashpodder support but make goldenpod
 	more reliable)
-- Ability to add podcasts via a commandline option:
-  goldenpod --add [feed url]
-- Ability to remove podcasts via a commandline option:
-  goldenpod --remove [feed url]
-- Ability to list podcasts via a commandline option:
-  goldenpod --list
 
 - - -
 
