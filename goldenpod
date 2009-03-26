@@ -1418,6 +1418,14 @@ sub addFeed
 		print "  goldenpod --remove \"$feed\"\n\n";
 	}
 	my $feeds = ParseList();
+	my $sources = locateSourceInFeedList($feed,$feeds);
+	if ($sources)
+	{
+		foreach my $i (@{$sources})
+		{
+			$feeds->[$i] = undef;
+		}
+	}
 	push(@{$feeds}, {
 			podcast => $feed,
 			match => $pattern,
@@ -1427,11 +1435,19 @@ sub addFeed
 
 	if ($pattern)
 	{
-		print "Added the fuzzy feed \"$feed\" with the regex pattern /$pattern/.\n";
+		print "Added the fuzzy feed \"$feed\" with the regex pattern /$pattern/\n";
 	}
 	else
 	{
 		print "Added the feed $feed\n";
+	}
+	if(scalar @{$sources} > 1)
+	{
+		print 'and removed '.scalar(@{$sources}).' old duplicates.'."\n";
+	}
+	else
+	{
+		print 'and removed one old duplicate.'."\n";
 	}
 	exit(0);
 }
@@ -1443,14 +1459,13 @@ sub removeFeed
 	shift;
 	my $feed = shift;
 	my $feeds = ParseList();
+	my $sources = locateSourceInFeedList($feed,$feeds);
 	my $removed = 0;
-	for my $n (0..@{$feeds})
+	if ($sources)
 	{
-		my $thisfeed = $feeds->[$n];
-		next if not defined $thisfeed or not defined $thisfeed->{podcast};
-		if ($feed eq $thisfeed->{podcast})
+		foreach my $i (@{$sources})
 		{
-			@{$feeds}[$n] = undef;
+			$feeds->[$i] = undef;
 			$removed = 1;
 		}
 	}
@@ -1465,6 +1480,32 @@ sub removeFeed
 		exit(1);
 	}
 	exit(0);
+}
+
+# Purpose: Check if a feed contains instances of the supplied source,
+# 	if it does returns an array of where in the $feeds array they are.
+# Usage: my $array = locateSourceInFeedList($feed, $feeds);
+sub locateSourceInFeedList
+{
+	my $feed = shift;
+	my $feeds = shift;
+	my $found = 0;
+	my @sources;
+	for my $n (0..@{$feeds})
+	{
+		my $thisfeed = $feeds->[$n];
+		next if not defined $thisfeed or not defined $thisfeed->{podcast};
+		if ($feed eq $thisfeed->{podcast})
+		{
+			push(@sources,$n);
+			$found = 1;
+		}
+	}
+	if(not $found)
+	{
+		return;
+	}
+	return \@sources;
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2108,6 +2149,10 @@ goldenpod fuzzy parser (see the PARSERS section further down for information
 about it). The syntax for that is:
 
 	goldenpod --add [URL] /REGEX/
+
+If you have added a feed using the fuzzy parser and want the normal parser, or
+the other way around, simply use the --add parameter again, with the syntax you
+want and any existing entries of that URL will be removed first.
 
 =head2 Removing feeds
 
