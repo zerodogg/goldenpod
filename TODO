@@ -1,13 +1,7 @@
 TODO for 0.9:
-- Add a new logfile algorithm (this to take advantage of perl more than
-	it is currently. It will break bashpodder support but make goldenpod
-	more reliable)
-
-- - -
-
-Suggested (feedback welcome):
-
-- Ability to "quickly download" the first podcast of a feed, like so:
-  goldenpod --quick [FEED_URL]
-  That will download the first file in [FEED_URL], only write that one to the
-  logfile and not check the ones in the configs.
+- Rwrite the logfile system, taking more advantage of perl than currently
+	instead of using the old podcasts.log. Keep track of filenames -> feed
+	mappings there to avoid the (arguably extremely rare) case of a file getting
+	moved.
+- A --quick command-line option to allow a user to download a single file from
+	a feed, without having to add it permanently to goldenpod.
