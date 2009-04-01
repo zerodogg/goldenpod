@@ -162,6 +162,7 @@ sub Help
 	PrintHelp('', '--list', 'Print the list of podcasts added to goldenpod');
 	PrintHelp('-a', '--add [URL]', 'Add the URL specified as a feed in goldenpod. You may optionally supply a second parameter, which makes the feed use the fuzzy parser with the regular expression supplied.');
 	PrintHelp('-r', '--remove [URL]', 'Remove the URL specified from goldenpod\'s feed list.');
+	PrintHelp('', '--testurl URL', 'Test URL using both parsers and display which parser is recommended for it.');
 	PrintHelp('', '--stats', 'Print some simple statistics');
 	PrintHelp('-u', '--dry-run', 'Display what would be done but don\'t do it. Implies --verbose');
 	PrintHelp('-w', '--no-download','Mark all podcasts as downloaded. Implies --verbose.');
@@ -1635,7 +1636,7 @@ sub FuzzyParseFeed
 			next;
 		}
 		# Only audio URLs
-		next if not $e =~ /.*\.$AudioRegex.*/i;
+		next if not $e =~ /.*[^(www)]\.$AudioRegex.*/i;
 		# Only stuff matching
 		next if not $e =~ /$match/;
 		chomp($e);
@@ -2101,7 +2102,58 @@ GetOptions (
 		}
 		exit(0);
 	},
-	
+	'testurl=s' => sub {
+		shift; my $url = shift;
+		initDownload();
+		my $Output = fetchURL($url);
+		my ($URLs, $Title) = ParseFeed($Output,'.',$url);
+		my ($fURLs, $fTitle) = FuzzyParseFeed($Output,'.',$url);
+		my $normalResults = scalar @{$URLs};
+		my $fuzzyResults = scalar @{$fURLs};
+		my $recommendedParser;
+		my $baseZero = basename($0);
+		print "\n";
+		if(not $normalResults and not $fuzzyResults)
+		{
+			print "Found nothing using either parser\n";
+		}
+		print 'Found '.$normalResults.' files using the standard parser'."\n";
+		print 'Found '.$fuzzyResults.' files using the fuzzy parser'."\n";
+		if ($fuzzyResults > $normalResults)
+		{
+			print 'Recommended parser: Fuzzy parser'."\n";
+			print 'Add with: '.$baseZero.' --add "'.$url.'" "/someRegex/"'."\n";
+			print 'To simply match/subscribe to all files, use: '.$baseZero.' --add "'.$url.'" /./'."\ n";
+		}
+		elsif($normalResults > $fuzzyResults || $normalResults == $fuzzyResults)
+		{
+			print 'Recommended parser: standard/RSS parser'."\n";
+			print 'Add with: '.$baseZero.' --add "'.$url."\"\n";
+		}
+		if ($normalResults > 0 && $fuzzyResults < $normalResults)
+		{
+			print "\n";
+			print 'The reason the fuzzy parser found fewer results might be because the'."\n";
+			print 'fuzzy parser limits results to only audio files. The recommended'."\n";
+			print 'parser to use in these cases is still the RSS parser, as it will provide'."\n";
+			print 'better results most of the time.'."\n";
+		}
+		elsif($normalResults > 0 && $fuzzyResults > $normalResults)
+		{
+			print "\n";
+			print 'The fuzzzy parser found more results than the standard/RSS parser.'."\n";
+			print 'This might be a bug in the standard/RSS parser. If this is an RSS feed'."\n";
+			print 'please report this as a bug. Otherwise, use the fuzzy parser.'."\n";
+		}
+		elsif($fuzzyResults == $normalResults)
+		{
+			print "\n";
+			print 'When both parsers return the same amount of results, the recommended'."\n";
+			print 'parser is the standard/RSS parser, as it is more restrictive and'."\n";
+			print 'accurate.'."\n";
+		}
+		exit(0);
+	},
 	'silent|s' => sub
 	{ 
 		$Verbose = 0;
@@ -2187,6 +2239,12 @@ If you have added a feed using the fuzzy parser and want the standard parser, or
 the other way around, simply use the --add parameter again, with the syntax you
 want and any existing entries of that URL will be removed first.
 
+If you are uncertain about which parser to choose, run:
+
+	goldenpod --rssdump [URL]
+
+It will then tell you which parser it recommends.
+
 =head2 Removing feeds
 
 Removing a feed is just like --add, use:
@@ -2244,6 +2302,10 @@ Removes the feed URL supplied from goldenpod's feed list.
 
 Prints a list of feeds in goldenpod, along with which parser the feeds are
 using.
+=item B<--testurl I<URL>>
+
+This downloads URL and parses it once with each parser, then tells you
+which parser it recommends that you to use.
 
 =item B<--prefer-curl>
 

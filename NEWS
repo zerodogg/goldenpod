@@ -5,6 +5,8 @@ GoldenPod changelog
 - Fixed a bug causing a harmless warning to get printed in some cases
 	when using --add
 - Added --rssdump to compliment the existing --fuzzydump
+- The fuzzy parser is a bit more restrictive when locating audio files
+- Added --testurl which tells the user which parser is recommended
 
 0.8
 - - - -
