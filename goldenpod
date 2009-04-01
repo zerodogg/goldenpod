@@ -175,6 +175,7 @@ sub Help
 	if ($all)
 	{
 		PrintHelp('', '--dumpinfo', 'Print the files goldenpod would work with');
+		PrintHelp('', '--debuginfo', 'The same as --dumpinfo, but also includes some additional system information');
 		PrintHelp('-l', '--nolog', 'Don\'t create a message logfile when in silent mode.');
 		PrintHelp('', '--prefer-curl', 'Prefer to use curl for downloading if available, instead of LWP (curl is used by default if LWP is missing)');
 		PrintHelp('', '--fuzzydump URL', 'Dump the list of files found by the fuzzy parser in URL. See the manpage for more information');
@@ -606,6 +607,17 @@ sub DumpInfo
 	if($debugInfo)
 	{
 		printf($pattern, 'Perl version', sprintf('%vd',$^V));
+		# Don't output useless "used only once, possible typo" warnings
+		no warnings 'once';
+		if (eval('use LWP;use LWP::UserAgent;1;'))
+		{
+			printf($pattern,'LWP version',$LWP::VERSION);
+			printf($pattern,'LWP::UserAgent version',$LWP::UserAgent::VERSION);
+		}
+		else
+		{
+			printf($pattern,'LWP','missing');
+		}
 		printf($pattern, 'OS',GetDistVer());
 		eval('use Digest::MD5;');
 		my $md5 = Digest::MD5->new();
@@ -2244,6 +2256,11 @@ is missing.
 
 Print the configuration and podcast list filenames that GoldenPod would read,
 in addition to the logfiles it would use and write to.
+
+=item B<--debuginfo>
+
+The same as --dumpinfo, but also includes some additional information that is
+useful to debug problems. Include the output of this with any bug report.
 
 =item B<--stats>
 
