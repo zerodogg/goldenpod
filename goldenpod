@@ -178,6 +178,7 @@ sub Help
 		PrintHelp('-l', '--nolog', 'Don\'t create a message logfile when in silent mode.');
 		PrintHelp('', '--prefer-curl', 'Prefer to use curl for downloading if available, instead of LWP (curl is used by default if LWP is missing)');
 		PrintHelp('', '--fuzzydump URL', 'Dump the list of files found by the fuzzy parser in URL. See the manpage for more information');
+		PrintHelp('', '--rssdump URL', 'Dump the list of files found by the standard parser in URL. See the manpage for more information');
 	}
 }
 
@@ -2071,6 +2072,23 @@ GetOptions (
 		}
 		exit(0);
 	},
+	'rssdump=s' => sub {
+		shift; my $url = shift;
+		initDownload();
+		my $Output = fetchURL($url);
+		my ($URLs, $Title) = ParseFeed($Output,'.',$url);
+		if (not @{$URLs})
+		{
+			print "Found no files\n";
+			exit(0);
+		}
+		print "Page is '$Title', found the following files:\n";
+		foreach my $f (@{$URLs})
+		{
+			print $f."\n";
+		}
+		exit(0);
+	},
 	
 	'silent|s' => sub
 	{ 
@@ -2153,7 +2171,7 @@ about it). The syntax for that is:
 
 	goldenpod --add [URL] /REGEX/
 
-If you have added a feed using the fuzzy parser and want the normal parser, or
+If you have added a feed using the fuzzy parser and want the standard parser, or
 the other way around, simply use the --add parameter again, with the syntax you
 want and any existing entries of that URL will be removed first.
 
@@ -2276,6 +2294,14 @@ in the podcasts.conf file (ie. to fetch podcasts from a non-RSS source).
 
 You can use this to see if GoldenPod finds anything in the URL, and
 to find out what your /REGEX/ for the URL should be.
+
+=item B<--rssdump I<URL>>
+
+This uses the GoldenPod standard/RSS parser to list files found in I<URL>.
+
+You can use this to see if GoldenPod finds anything in the URL. It is mostly
+useful to find out if GoldenPod has problems parsing a feed, or if a certain
+feed needs the fuzzy parser to work properly.
 
 =item B<-o, --rmold>
 

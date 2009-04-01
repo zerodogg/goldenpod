@@ -4,6 +4,7 @@ GoldenPod changelog
 - - - -
 - Fixed a bug causing a harmless warning to get printed in some cases
 	when using --add
+- Added --rssdump to compliment the existing --fuzzydump
 
 0.8
 - - - -
