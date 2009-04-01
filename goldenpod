@@ -50,7 +50,7 @@ my (
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config);
 
 # Version number
-my $Version = '0.8';
+my $Version = '0.8.1';
 # Our user agent string
 my $UserAgent = 'GoldenPod '.$Version.' (podcatcher)';
 
@@ -1441,13 +1441,16 @@ sub addFeed
 	{
 		print "Added the feed $feed\n";
 	}
-	if(scalar @{$sources} > 1)
+	if ($sources)
 	{
-		print 'and removed '.scalar(@{$sources}).' old duplicates.'."\n";
-	}
-	else
-	{
-		print 'and removed one old duplicate.'."\n";
+		if(scalar @{$sources} > 1)
+		{
+			print 'and removed '.scalar(@{$sources}).' old duplicates.'."\n";
+		}
+		else
+		{
+			print 'and removed one old duplicate.'."\n";
+		}
 	}
 	exit(0);
 }

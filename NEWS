@@ -1,5 +1,10 @@
 GoldenPod changelog
 
+0.8.1
+- - - -
+- Fixed a bug causing a harmless warning to get printed in some cases
+	when using --add
+
 0.8
 - - - -
 - Made the default output more informative
