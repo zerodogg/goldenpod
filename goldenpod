@@ -2166,7 +2166,8 @@ GetOptions (
 		}
 	},
 	'ignore-pattern|ignorepattern|i=s' => sub {
-		$IgnorePattern = $_[1];
+		shift;
+		$IgnorePattern = shift;
 		eval { qr/$IgnorePattern/ } or die "The regexp supplied to --ignore-pattern is invalid ($@)\n";
 	},
 	# Display some simple statistics
