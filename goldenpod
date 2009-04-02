@@ -2119,16 +2119,19 @@ GetOptions (
 		}
 		print 'Found '.$normalResults.' files using the standard parser'."\n";
 		print 'Found '.$fuzzyResults.' files using the fuzzy parser'."\n";
+		(my $quotedUrl = $url) =~ s/'/\\'/g;
 		if ($fuzzyResults > $normalResults)
 		{
 			print 'Recommended parser: Fuzzy parser'."\n";
-			print 'Add with: '.$baseZero.' --add "'.$url.'" "/someRegex/"'."\n";
-			print 'To simply match/subscribe to all files, use: '.$baseZero.' --add "'.$url.'" /./'."\ n";
+			print 'Add with: '.$baseZero.' --add \''.$quotedUrl.'\' \'/someRegex/\''."\n";
+			print 'To simply match/subscribe to all files, use: '.$baseZero.' --add \''.$quotedUrl.'\' \'/./\''."\n\n";
+			print 'To subscribe to certain files, use a regex. You can list all files GoldenPod'."\n";
+			print 'finds in the feed by running: '.$baseZero.' --fuzzydump \''.$quotedUrl.'\''."\n";
 		}
 		elsif($normalResults > $fuzzyResults || $normalResults == $fuzzyResults)
 		{
 			print 'Recommended parser: standard/RSS parser'."\n";
-			print 'Add with: '.$baseZero.' --add "'.$url."\"\n";
+			print 'Add with: '.$baseZero.' --add \''.$quotedUrl."'\n";
 		}
 		if ($normalResults > 0 && $fuzzyResults < $normalResults)
 		{
