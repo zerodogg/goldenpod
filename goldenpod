@@ -1599,6 +1599,12 @@ sub ParseTitle
 sub ParseFeed
 {
 	my $FeedContents = shift;
+
+	if(not $FeedContents)
+	{
+		return([],undef);
+	}
+
 	my $title;
 	my @URLs;
 	# We don't care about newlines
@@ -1633,10 +1639,16 @@ sub ParseFeed
 
 # Purpose: Fuzzy parse a feed. Gets audio URLs out of a non-RSS (ie. XML, HTML,
 # 	or any text format really) address
-# Usage: my($URLs,$Title) = FuzzyParseFeed(FEED_CONTENTS);
+# Usage: my($URLs,$Title) = FuzzyParseFeed(FEED_CONTENTS,regexToMatch,sourceURL);
 sub FuzzyParseFeed
 {
 	my $FeedContents = shift;
+
+	if(not $FeedContents)
+	{
+		return([],undef);
+	}
+
 	my $match = shift;
 	my $fullURL = shift;
 	my $URL = $fullURL;
