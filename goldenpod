@@ -758,6 +758,7 @@ sub CleanCatalogue
 	# For compatibility with older GoldenPods
 	my $CWD = getcwd();
 	chdir($CatalogueBase);
+	my $removedSomething = false;
 	print 'Cleaning up the catalogue...';
 	foreach my $CurrentDirectory (glob("$CatalogueBase/*"))
 	{
@@ -767,13 +768,21 @@ sub CleanCatalogue
 			next if not -l $CurrentFile;
 			if(not -e readlink($CurrentFile))
 			{
+				$removedSomething = true;
 				unlink($CurrentFile);
 			}
 		}
 		chdir('..');
 	}
 	chdir($CWD);
-	print "done\n";
+	if (not $removedSomething)
+	{
+		print "nothing to clean\n";
+	}
+	else
+	{
+		print "done\n";
+	}
 }
 
 # Purpose: Remove empty directories in ./
@@ -781,14 +790,17 @@ sub CleanCatalogue
 sub RemoveEmptyDirs
 {
 	my $FromDirectory = shift;
+	my $removed = 0;
 	foreach my $Directory (glob("$FromDirectory/*"))
 	{
 		next if not -d $Directory;
 		if(DirIsEmpty($Directory))
 		{
 			rmdir($Directory);
+			$removed++;
 		}
 	}
+	return $removed;
 }
 
 # Purpose: Rewrite all playlists
@@ -856,9 +868,17 @@ sub CleanupDirs
 	RewritePlaylists($CatalogueDirectory);
 	# Remove empty directories
 	print 'Removing empty directories...';
-	RemoveEmptyDirs($CatalogueDirectory);
-	RemoveEmptyDirs($Config{WorkingDir});
-	print "done\n";
+	my $removed = 0;
+	$removed += RemoveEmptyDirs($CatalogueDirectory);
+	$removed += RemoveEmptyDirs($Config{WorkingDir});
+	if ($removed)
+	{
+		print "done\n";
+	}
+	else
+	{
+		print "nothing to remove\n";
+	}
 	if(-e ($Config{WorkingDir}.'/latest') and not readlink($Config{WorkingDir}.'/latest'))
 	{
 		unlink($Config{WorkingDir}.'/latest');
@@ -2412,6 +2432,7 @@ Removes the feed URL supplied from goldenpod's feed list.
 
 Prints a list of feeds in goldenpod, along with which parser the feeds are
 using.
+
 =item B<--ping I<URL>>
 
 This downloads URL and parses it once with each parser, then tells you
