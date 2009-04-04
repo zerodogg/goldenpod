@@ -44,7 +44,7 @@ my (
 	$NoLog,		$FirstOnly,	$CopyFiles_Delete,
 	$UserConfigDir,	$IgnorePattern,
 	$RemoveOldFiles,$DryRun_Mode,	$CopyFilesTo,
-	$FileNumber,	$PodcastLog,
+	$FileNumber,	$PodcastLog, $downloadInitialized,
 );
 # Global hashes
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config, %ReturnVals);
@@ -226,6 +226,8 @@ sub LWPProgress
 # Usage. initDownload();
 sub initDownload
 {
+	return if $downloadInitialized;
+	$downloadInitialized = true;
 	my %Has = (
 		LWP => 0,
 		curl => 0,
@@ -1593,6 +1595,119 @@ sub ParseTitle
 	return $FeedTitle;
 }
 
+# Purpose: Ping a feed and output useful information to the user
+# Usage: pingFeed(anything, URL, secondTry?)
+#
+# the first arg is ignored, this for use in getOpts, just leave it undef.
+# URL is the url to ping
+# secondTry is an int if this is our second attempt at parsing a feed.
+sub pingFeed
+{
+	shift; my $url = shift;
+	my $secondTry = shift;
+	initDownload();
+	my $Output = fetchURL($url);
+	exit if not $Output;
+	my ($URLs, $Title) = ParseFeed($Output,'.',$url);
+	my ($fURLs, $fTitle) = FuzzyParseFeed($Output,'.',$url);
+	my $normalResults = scalar @{$URLs};
+	my $fuzzyResults = scalar @{$fURLs};
+	my $recommendedParser;
+	my $baseZero = basename($0);
+	print "\n";
+	if(not $normalResults and not $fuzzyResults)
+	{
+		my $feedList = locateFeed($Output);
+		if ($secondTry)
+		{
+			print "Found nothing using either parser this time either.\n";
+			if ($secondTry > 1)
+			{
+				print "You may want to manually --ping any of the other feeds\n";
+				print "listed above.\n";
+			}
+			exit(0);
+		}
+		if ($feedList and @{$feedList})
+		{
+			my $feed = @{$feedList} > 1 ? 'feeds' : 'feed';
+			print "Found nothign using either parser, however, the page\nlisted the following $feed:\n";
+			print $_."\n" foreach(@{$feedList});
+			print "\nTrying the feed $feedList->[0]:\n";
+			pingFeed(undef,$feedList->[0],scalar @{$feedList});
+		}
+		else
+		{
+			print "Found nothing using either parser\n";
+		}
+		exit(0);
+	}
+	print 'Found '.$normalResults.' files using the standard parser'."\n";
+	print 'Found '.$fuzzyResults.' files using the fuzzy parser'."\n";
+	(my $quotedUrl = $url) =~ s/'/\\'/g;
+	if ($fuzzyResults > $normalResults)
+	{
+		print 'Recommended parser: Fuzzy parser'."\n";
+		print 'Add with: '.$baseZero.' --add \''.$quotedUrl.'\' \'/someRegex/\''."\n";
+		print 'To simply match/subscribe to all files, use: '.$baseZero.' --add \''.$quotedUrl.'\' \'/./\''."\n\n";
+		print 'To subscribe to certain files, use a regex. You can list all files GoldenPod'."\n";
+		print 'finds in the feed by running: '.$baseZero.' --fuzzydump \''.$quotedUrl.'\''."\n";
+	}
+	elsif($normalResults > $fuzzyResults || $normalResults == $fuzzyResults)
+	{
+		print 'Recommended parser: standard/RSS parser'."\n";
+		print 'Add with: '.$baseZero.' --add \''.$quotedUrl."'\n";
+	}
+	if ($normalResults > 0 && $fuzzyResults < $normalResults)
+	{
+		print "\n";
+		print 'The reason the fuzzy parser found fewer results might be because the'."\n";
+		print 'fuzzy parser limits results to only audio files. The recommended'."\n";
+		print 'parser to use in these cases is still the RSS parser, as it will provide'."\n";
+		print 'better results most of the time.'."\n";
+	}
+	elsif($normalResults > 0 && $fuzzyResults > $normalResults)
+	{
+		print "\n";
+		print 'The fuzzzy parser found more results than the standard/RSS parser.'."\n";
+		print 'This might be a bug in the standard/RSS parser. If this is an RSS feed'."\n";
+		print 'please report this as a bug. Otherwise, use the fuzzy parser.'."\n";
+	}
+	elsif($fuzzyResults == $normalResults)
+	{
+		print "\n";
+		print 'When both parsers return the same amount of results, the recommended'."\n";
+		print 'parser is the standard/RSS parser, as it is more restrictive and'."\n";
+		print 'accurate.'."\n";
+	}
+	exit(0);
+}
+
+# Purpose: Parse a HTML page, looking for <link rel="alternate"> entries
+# 	for feeds
+# Usage: my $feedURLs = locateFeed(FEED_CONTENTS);
+sub locateFeed
+{
+	my $contents = shift;
+	my @URLs;
+
+	foreach my $line (split(/(<|>|\n)/,$contents))
+	{
+		next if not $line =~ /rel="alternate"/i;
+		my $type = $line;
+		$type =~ s/.*type=["']([^"']+)["'].*/$1/;
+		next if not $type;
+		if(not $type =~ /(rss|atom)\+xml/ and not $line =~ /rss/)
+		{
+			next;
+		}
+		$line =~ s/.*href=["'](\S+)["'].*/$1/g;
+		next if not $line;
+		push(@URLs,$line);
+	}
+	return \@URLs;
+}
+
 # Purpose: Parse a feed
 # Usage: my($URLs,$Title) = ParseFeed(FEED_CONTENTS);
 #  $Title can be undef. $URLs is an arrayref, can be empty.
@@ -2147,63 +2262,7 @@ GetOptions (
 		}
 		exit(0);
 	},
-	'ping=s' => sub {
-		shift; my $url = shift;
-		initDownload();
-		my $Output = fetchURL($url);
-		exit if not $Output;
-		my ($URLs, $Title) = ParseFeed($Output,'.',$url);
-		my ($fURLs, $fTitle) = FuzzyParseFeed($Output,'.',$url);
-		my $normalResults = scalar @{$URLs};
-		my $fuzzyResults = scalar @{$fURLs};
-		my $recommendedParser;
-		my $baseZero = basename($0);
-		print "\n";
-		if(not $normalResults and not $fuzzyResults)
-		{
-			print "Found nothing using either parser\n";
-			exit(0);
-		}
-		print 'Found '.$normalResults.' files using the standard parser'."\n";
-		print 'Found '.$fuzzyResults.' files using the fuzzy parser'."\n";
-		(my $quotedUrl = $url) =~ s/'/\\'/g;
-		if ($fuzzyResults > $normalResults)
-		{
-			print 'Recommended parser: Fuzzy parser'."\n";
-			print 'Add with: '.$baseZero.' --add \''.$quotedUrl.'\' \'/someRegex/\''."\n";
-			print 'To simply match/subscribe to all files, use: '.$baseZero.' --add \''.$quotedUrl.'\' \'/./\''."\n\n";
-			print 'To subscribe to certain files, use a regex. You can list all files GoldenPod'."\n";
-			print 'finds in the feed by running: '.$baseZero.' --fuzzydump \''.$quotedUrl.'\''."\n";
-		}
-		elsif($normalResults > $fuzzyResults || $normalResults == $fuzzyResults)
-		{
-			print 'Recommended parser: standard/RSS parser'."\n";
-			print 'Add with: '.$baseZero.' --add \''.$quotedUrl."'\n";
-		}
-		if ($normalResults > 0 && $fuzzyResults < $normalResults)
-		{
-			print "\n";
-			print 'The reason the fuzzy parser found fewer results might be because the'."\n";
-			print 'fuzzy parser limits results to only audio files. The recommended'."\n";
-			print 'parser to use in these cases is still the RSS parser, as it will provide'."\n";
-			print 'better results most of the time.'."\n";
-		}
-		elsif($normalResults > 0 && $fuzzyResults > $normalResults)
-		{
-			print "\n";
-			print 'The fuzzzy parser found more results than the standard/RSS parser.'."\n";
-			print 'This might be a bug in the standard/RSS parser. If this is an RSS feed'."\n";
-			print 'please report this as a bug. Otherwise, use the fuzzy parser.'."\n";
-		}
-		elsif($fuzzyResults == $normalResults)
-		{
-			print "\n";
-			print 'When both parsers return the same amount of results, the recommended'."\n";
-			print 'parser is the standard/RSS parser, as it is more restrictive and'."\n";
-			print 'accurate.'."\n";
-		}
-		exit(0);
-	},
+	'ping=s' => \&pingFeed,
 	'silent|s' => sub
 	{ 
 		$Verbose = 0;
