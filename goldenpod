@@ -2292,9 +2292,9 @@ want and any existing entries of that URL will be removed first.
 
 If you are uncertain about which parser to choose, run:
 
-	goldenpod --rssdump [URL]
+	goldenpod --ping [URL]
 
-It will then tell you which parser it recommends.
+It will then tell you which parser it recommends for the URL supplied.
 
 =head2 Removing feeds
 
