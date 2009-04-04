@@ -47,7 +47,7 @@ my (
 	$FileNumber,	$PodcastLog,
 );
 # Global hashes
-my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config);
+my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config, %ReturnVals);
 
 # Version number
 my $Version = '0.8.1';
@@ -71,6 +71,7 @@ my $AudioRegex = '(ogg|oga|mp3|m4a|wave?|flac|wma|ape|tta|aac|mp2|mpa|ram?|aiff?
 $SIG{CHLD} = sub
 {
 	my $PID = wait;
+	$ReturnVals{$PID} = $? >> 8;
 	return(1);
 };
 
@@ -342,6 +343,13 @@ sub fetchURL
 				$Output .= $_;
 			}
 		}
+		close($Child_OUT);
+		close($Child_IN);
+		if(not $ReturnVals{$PID} == 0)
+		{
+			warn("Download of $URL failed, curl exited with the return value ".$ReturnVals{$PID}."\n");
+			return;
+		}
 		# Return the output
 		return $Output;
 	}
@@ -365,7 +373,14 @@ sub DownloadURL
 	chdir($ToDir);
 
 	my $fileName = basename($URL);
-	fetchURL($URL,$fileName);
+	if(fetchURL($URL,$fileName))
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1712,7 +1727,6 @@ sub DownloadPodcasts
 			my $DownloadStatus = DownloadURL($Config{WorkingDir}.'/'.$date, $URL);
 			if($DownloadStatus)
 			{
-				warn "Download of $URL failed! Curl exited with return value $DownloadStatus\n";
 				next;
 			}
 			else
@@ -2072,6 +2086,7 @@ GetOptions (
 		shift; my $url = shift;
 		initDownload();
 		my $Output = fetchURL($url);
+		exit if not $Output;
 		my ($URLs, $Title) = FuzzyParseFeed($Output,'.',$url);
 		if (not @{$URLs})
 		{
@@ -2089,6 +2104,7 @@ GetOptions (
 		shift; my $url = shift;
 		initDownload();
 		my $Output = fetchURL($url);
+		exit if not $Output;
 		my ($URLs, $Title) = ParseFeed($Output,'.',$url);
 		if (not @{$URLs})
 		{
@@ -2106,6 +2122,7 @@ GetOptions (
 		shift; my $url = shift;
 		initDownload();
 		my $Output = fetchURL($url);
+		exit if not $Output;
 		my ($URLs, $Title) = ParseFeed($Output,'.',$url);
 		my ($fURLs, $fTitle) = FuzzyParseFeed($Output,'.',$url);
 		my $normalResults = scalar @{$URLs};
