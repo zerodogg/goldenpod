@@ -1695,13 +1695,13 @@ sub locateFeed
 	{
 		next if not $line =~ /rel="alternate"/i;
 		my $type = $line;
-		$type =~ s/.*type=["']([^"']+)["'].*/$1/;
+		$type =~ s/.*type=["']([^"']+)["'].*/$1/i;
 		next if not $type;
-		if(not $type =~ /(rss|atom)\+xml/ and not $line =~ /rss/)
+		if(not $type =~ /(rss|atom)\+xml/i and not $line =~ /rss/i)
 		{
 			next;
 		}
-		$line =~ s/.*href=["'](\S+)["'].*/$1/g;
+		$line =~ s/.*href=["'](\S+)["'].*/$1/gi;
 		next if not $line;
 		push(@URLs,$line);
 	}
@@ -1785,9 +1785,9 @@ sub FuzzyParseFeed
 		# Get URLs
 		if (
 			# This one extracts URLs not containing whitespace and \"'
-			not $e =~ s#.*(https?[^\\"'\s]+)["']?.*#$1#g and
+			not $e =~ s#.*(https?[^\\"'\s]+)["']?.*#$1#gi and
 			# The same as above, but allows "'
-			not $e =~ s#.*(https?\S*)["']?.*#$1#g and
+			not $e =~ s#.*(https?\S*)["']?.*#$1#gi and
 			# /something/... - ie. without domain and http://
 			not $e =~ s#.*["'](/\S+\.\S+)["'].*#$1#
 		)
