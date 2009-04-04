@@ -2162,6 +2162,7 @@ GetOptions (
 		if(not $normalResults and not $fuzzyResults)
 		{
 			print "Found nothing using either parser\n";
+			exit(0);
 		}
 		print 'Found '.$normalResults.' files using the standard parser'."\n";
 		print 'Found '.$fuzzyResults.' files using the fuzzy parser'."\n";
