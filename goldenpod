@@ -162,7 +162,7 @@ sub Help
 	PrintHelp('', '--list', 'Print the list of podcasts added to goldenpod');
 	PrintHelp('-a', '--add [URL]', 'Add the URL specified as a feed in goldenpod. You may optionally supply a second parameter, which makes the feed use the fuzzy parser with the regular expression supplied.');
 	PrintHelp('-r', '--remove [URL]', 'Remove the URL specified from goldenpod\'s feed list.');
-	PrintHelp('', '--testurl URL', 'Test URL using both parsers and display which parser is recommended for it.');
+	PrintHelp('', '--ping URL', 'Test URL using both parsers and display which parser is recommended for it.');
 	PrintHelp('', '--stats', 'Print some simple statistics');
 	PrintHelp('-u', '--dry-run', 'Display what would be done but don\'t do it. Implies --verbose');
 	PrintHelp('-w', '--no-download','Mark all podcasts as downloaded. Implies --verbose.');
@@ -2102,7 +2102,7 @@ GetOptions (
 		}
 		exit(0);
 	},
-	'testurl=s' => sub {
+	'ping=s' => sub {
 		shift; my $url = shift;
 		initDownload();
 		my $Output = fetchURL($url);
@@ -2306,7 +2306,7 @@ Removes the feed URL supplied from goldenpod's feed list.
 
 Prints a list of feeds in goldenpod, along with which parser the feeds are
 using.
-=item B<--testurl I<URL>>
+=item B<--ping I<URL>>
 
 This downloads URL and parses it once with each parser, then tells you
 which parser it recommends that you to use.

@@ -6,7 +6,7 @@ GoldenPod changelog
 	when using --add
 - Added --rssdump to compliment the existing --fuzzydump
 - The fuzzy parser is a bit more restrictive when locating audio files
-- Added --testurl which tells the user which parser is recommended
+- Added --ping which tells the user which parser is recommended
 
 0.8
 - - - -
