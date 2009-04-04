@@ -268,6 +268,11 @@ sub fetchURL
 	my $URL = shift;
 	my $targetFile = shift;
 
+	if(not $URL =~ m#^\S+://#)
+	{
+		$URL = 'http://'.$URL;
+	}
+
 	if ($downloader eq 'LWP')
 	{
 		# Reset our state
@@ -282,16 +287,17 @@ sub fetchURL
 		);
 		my $response;
 
-		printv('Downloading '.$URL.' ... ');
 		# if we have a target file then we just use ->mirror, that downloads
 		# it to a file instead and handles all the nasties for us.
 		if ($targetFile)
 		{
+			printv('Downloading '.$URL.' ... ');
 			$response = $UA->mirror($URL,$targetFile);
 		}
 		# If we don't, just use standard get
 		else
 		{
+			printv('Fetching '.$URL.' ... ');
 			$response = $UA->get($URL);
 		}
 		if ($Verbose)
@@ -309,7 +315,6 @@ sub fetchURL
 	}
 	elsif ($downloader eq 'curl')
 	{
-		printv('Fetching '.$URL."\n");
 		my ($Child_IN, $Child_OUT, $Output);
 		# Curl options:
 		# -C to continue when possible
@@ -331,6 +336,11 @@ sub fetchURL
 		if ($targetFile)
 		{
 			push(@CurlArgs,'-O');
+			printv('Downloading '.$URL."\n");
+		}
+		else
+		{
+			printv('Fetching '.$URL."\n");
 		}
 
 		my $PID = open2($Child_OUT, $Child_IN, 'curl',@CurlArgs,$URL) or die("Unable to open3() connection to curl: $!\n");
