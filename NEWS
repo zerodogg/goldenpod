@@ -8,6 +8,8 @@ GoldenPod changelog
 - The fuzzy parser is a bit more restrictive when locating audio files
 - Added --ping which tells the user which parser is recommended
 - Fixed some minor issues with curl support
+- Fixed a (harmless) bug that could cause files to be added to the download
+	queue twice when using the RSS parser (would still only be downloaded once).
 
 0.8
 - - - -

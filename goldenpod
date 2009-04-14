@@ -1742,6 +1742,8 @@ sub ParseFeed
 
 	my $title;
 	my @URLs;
+	# This is used to avoid dupes in @URLs
+	my %URLList;
 	# We don't care about newlines
 	$FeedContents =~ s/(\r\n|\r|\n)/ /g;
 	
@@ -1765,7 +1767,11 @@ sub ParseFeed
 		}
 		# Add the title string to the PodNames array (if we have found the title)
 		$PodNames{$CurrUrl} = $FeedTitle;
-		push(@URLs, $CurrUrl);
+		if(not $URLList{$CurrUrl})
+		{
+			push(@URLs, $CurrUrl);
+			$URLList{$CurrUrl} = 1;
+		}
 	}
 	# The current @URLs has the oldest first. Reverse it before returning it.
 	@URLs = reverse(@URLs);
