@@ -50,7 +50,7 @@ my (
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config, %ReturnVals);
 
 # Version number
-my $Version = '0.8.1';
+my $Version = '0.9';
 # Our user agent string
 my $UserAgent = 'GoldenPod '.$Version.' (podcatcher)';
 
