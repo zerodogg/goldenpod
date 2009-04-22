@@ -1,9 +1,11 @@
 GoldenPod changelog
 
-0.9
+0.8.2
 - - - -
 - --ping now does feed autodiscovery if the recommended parser is
 	the fuzzy parser
+- Fixed a bug causing some files not to be recognized properly when the
+	podcast filter was enabled
 
 0.8.1
 - - - -
