@@ -1702,7 +1702,7 @@ sub pingFeed
 		print 'parser is the standard/RSS parser, as it is more restrictive and'."\n";
 		print 'accurate.'."\n";
 	}
-	if ($recommendedParser eq 'fuzzy' && $feedList)
+	if ($recommendedParser eq 'fuzzy' && $feedList && @{$feedList} > 0)
 	{
 		print "\n";
 		my $feed = @{$feedList} > 1 ? 'feeds' : 'feed';
