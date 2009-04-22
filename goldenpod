@@ -1769,13 +1769,16 @@ sub ParseFeed
 
 	# Do the real parsing and add to @urls
 	# We want to extract all url='s
-	while(((my $CurrUrl = $FeedContents) =~ s/^.*url\s*=\s*[\"\']([^\"\']+)[\"\'].*$/$1/i))
+	foreach my $CurrUrl (split(/(<|>)/,$FeedContents))
 	{
-		$FeedContents =~ s/url\s*=\s*[\"\'](\Q$CurrUrl\E)[\"\']//i;
+		next if not $CurrUrl =~ /(url=["'])/i;
+		my $quote = $CurrUrl;
+		$quote =~ s/.*url=(["']).*/$1/i;
+		$CurrUrl =~ s/.*url=$quote([^$quote]+)$quote.*/$1/i;
 		# Filter away non-audio feeds if the user wants it.
 		if ($Config{PodcastFilter})
 		{
-			next if not basename($CurrUrl) =~ /.*\.$AudioRegex.*/;
+			next if not basename($CurrUrl) =~ /.*\.$AudioRegex.*/i;
 		}
 		# Filter away stuff in $IgnorePattern
 		if ($IgnorePattern)
