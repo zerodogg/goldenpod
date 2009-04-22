@@ -1634,10 +1634,10 @@ sub pingFeed
 	my $fuzzyResults = scalar @{$fURLs};
 	my $recommendedParser;
 	my $baseZero = basename($0);
+	my $feedList = locateFeed($Output);
 	print "\n";
 	if(not $normalResults and not $fuzzyResults)
 	{
-		my $feedList = locateFeed($Output);
 		if ($secondTry)
 		{
 			print "Found nothing using either parser this time either.\n";
@@ -1662,11 +1662,12 @@ sub pingFeed
 		}
 		exit(0);
 	}
-	print 'Found '.$normalResults.' files using the standard parser'."\n";
+	print 'Found '.$normalResults.' files using the standard/RSS parser'."\n";
 	print 'Found '.$fuzzyResults.' files using the fuzzy parser'."\n";
 	(my $quotedUrl = $url) =~ s/'/\\'/g;
 	if ($fuzzyResults > $normalResults)
 	{
+		$recommendedParser = 'fuzzy';
 		print 'Recommended parser: Fuzzy parser'."\n";
 		print 'Add with: '.$baseZero.' --add \''.$quotedUrl.'\' \'/someRegex/\''."\n";
 		print 'To simply match/subscribe to all files, use: '.$baseZero.' --add \''.$quotedUrl.'\' \'/./\''."\n\n";
@@ -1675,6 +1676,7 @@ sub pingFeed
 	}
 	elsif($normalResults > $fuzzyResults || $normalResults == $fuzzyResults)
 	{
+		$recommendedParser = 'rss';
 		print 'Recommended parser: standard/RSS parser'."\n";
 		print 'Add with: '.$baseZero.' --add \''.$quotedUrl."'\n";
 	}
@@ -1699,6 +1701,21 @@ sub pingFeed
 		print 'When both parsers return the same amount of results, the recommended'."\n";
 		print 'parser is the standard/RSS parser, as it is more restrictive and'."\n";
 		print 'accurate.'."\n";
+	}
+	if ($recommendedParser eq 'fuzzy' && $feedList)
+	{
+		print "\n";
+		my $feed = @{$feedList} > 1 ? 'feeds' : 'feed';
+		my $other = @{$feedList} > 1 ? 'other' : 'another';
+		my $oneOf = @{$feedList} > 1 ? ' one of' : '';
+		print "NOTE: This URL referenced $other $feed. You may want to try$oneOf the $feed\n";
+		$feed = ucfirst($feed);
+		print "listed below instead of using the fuzzy parser directly on this URL.\n$feed: ";
+		print "\n" if $feed eq 'Feeds';
+		foreach my $f(@{$feedList})
+		{
+			print $f."\n";
+		}
 	}
 	exit(0);
 }
@@ -2442,7 +2459,8 @@ using.
 =item B<--ping I<URL>>
 
 This downloads URL and parses it once with each parser, then tells you
-which parser it recommends that you to use.
+which parser it recommends that you to use. It will also attempt feed
+autodiscovery if the URL is not an RSS feed.
 
 =item B<--prefer-curl>
 
