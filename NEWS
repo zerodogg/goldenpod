@@ -6,6 +6,7 @@ GoldenPod changelog
 	the fuzzy parser
 - Fixed a bug causing some files not to be recognized properly when the
 	podcast filter was enabled
+- Made some minor changes to the user agent string
 
 0.8.1
 - - - -

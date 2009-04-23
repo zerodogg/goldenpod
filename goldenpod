@@ -31,6 +31,8 @@ use Cwd qw(getcwd realpath);
 use Getopt::Long;
 # Copying files
 use File::Copy;
+# Used to get OS name for user agent
+use POSIX qw(uname);
 # open() call to commands
 use IPC::Open2;
 # Using true/false is easier to read than 0/1
@@ -52,7 +54,7 @@ my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config, %ReturnVals);
 # Version number
 my $Version = '0.8.2';
 # Our user agent string
-my $UserAgent = 'GoldenPod '.$Version.' (podcatcher)';
+my $UserAgent = 'GoldenPod/'.$Version.' (%OS%; podcatcher; Using %downloader%)';
 
 # The global date, as used in directory names, value set in main()
 my $date;
@@ -222,11 +224,22 @@ sub LWPProgress
 	}
 }
 
-# Purpose: Initialize the downloader
-# Usage. initDownload();
+# Purpsoe: Initialize the downloader
+# Usage: initDownload();
 sub initDownload
 {
 	return if $downloadInitialized;
+	detectDownloader();
+	my $os = [uname()]->[0];
+	$os = $os eq 'Linux' ? 'GNU/Linux' : $os;
+	$UserAgent =~ s/%OS%/$os/g;
+	$UserAgent =~ s/%downloader%/$downloader/g;
+}
+
+# Purpose: Detect our downloader
+# Usage: detectDownloader();
+sub detectDownloader
+{
 	$downloadInitialized = true;
 	my %Has = (
 		LWP => 0,
@@ -252,13 +265,15 @@ sub initDownload
 	{
 		die("Both LWP and curl are missing\n");
 	}
-
-	if ($Has{curl})
+	elsif ($Has{curl})
 	{
 		$downloader = 'curl';
 		return;
 	}
-	die("No downloader found\n");
+	else
+	{
+		die("No downloader found. GoldenPod needs either LWP (libwww-perl) or curl.\n");
+	}
 }
 
 # Purpose: Fetch a URL, either returning the data or writing a file
