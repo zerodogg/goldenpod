@@ -1607,7 +1607,7 @@ sub ParseTitle
 	chomp($ParseTitle);
 	foreach my $t (split(/</i,$ParseTitle))
 	{
-		next if not $t =~ s/title[^>]*>//;
+		next if not $t =~ s/title[^>]*>//i;
 		$FeedTitle = $t;
 		if(length($FeedTitle) > 400)
 		{
@@ -1666,7 +1666,7 @@ sub pingFeed
 		if ($feedList and @{$feedList})
 		{
 			my $feed = @{$feedList} > 1 ? 'feeds' : 'feed';
-			print "Found nothign using either parser, however, the page\nlisted the following $feed:\n";
+			print "Found nothing using either parser, however, the page\nlisted the following $feed:\n";
 			print $_."\n" foreach(@{$feedList});
 			print "\nTrying the feed $feedList->[0]:\n";
 			pingFeed(undef,$feedList->[0],scalar @{$feedList});
