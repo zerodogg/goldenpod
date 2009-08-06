@@ -19,16 +19,18 @@ endif
 BINDIR ?= $(prefix)/bin
 DATADIR ?= $(prefix)/share
 
+DISTFILES = AUTHORS COPYING goldenpod INSTALL Makefile NEWS README TODO goldenpod.1
+
 # Install goldenpod
 install:
 	mkdir -p "$(BINDIR)"
 	cp goldenpod "$(BINDIR)"
 	chmod 755 "$(BINDIR)/goldenpod"
-	[  -e goldenpod.1 ] && mkdir -p "$(DATADIR)/man/man1" && cp goldenpod.1 "$(DATADIR)/man/man1" || true
+	[ -e goldenpod.1 ] && mkdir -p "$(DATADIR)/man/man1" && cp goldenpod.1 "$(DATADIR)/man/man1" || true
 localinstall:
 	mkdir -p "$(BINDIR)"
 	ln -sf $(shell pwd)/goldenpod $(BINDIR)/
-	[  -e goldenpod.1 ] && mkdir -p "$(DATADIR)/man/man1" && ln -sf $(shell pwd)/goldenpod.1 "$(DATADIR)/man/man1" || true
+	[ -e goldenpod.1 ] && mkdir -p "$(DATADIR)/man/man1" && ln -sf $(shell pwd)/goldenpod.1 "$(DATADIR)/man/man1" || true
 # Uninstall an installed goldenpod
 uninstall:
 	rm -f "$(BINDIR)/goldenpod" "$(BINDIR)/gpconf" "$(DATADIR)/man/man1/goldenpod.1"
@@ -49,8 +51,7 @@ man:
 # Create the tarball
 distrib: clean test man
 	mkdir -p goldenpod-$(VERSION)
-	cp -r ./`ls|grep -v goldenpod-$(VERSION)` ./goldenpod-$(VERSION)
-	rm -rf `find goldenpod-$(VERSION) -name \\.git`
-	rm -rf goldenpod-$(VERSION)/devel-tools
+	cp $(DISTFILES) ./goldenpod-$(VERSION)
 	tar -jcvf goldenpod-$(VERSION).tar.bz2 ./goldenpod-$(VERSION)
 	rm -rf goldenpod-$(VERSION)
+	rm -f goldenpod.1
