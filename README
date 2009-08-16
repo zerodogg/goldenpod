@@ -20,8 +20,9 @@ cron-friendly and user-friendly.
 Information on how to configure goldenpod can be found in the manpage. If
 GoldenPod is installed globally on your system just type "man goldenpod" and
 the manpage will happily pop up and tell you what you need, if not then type
-"man ./goldenpod.1" in the directory containing the GoldenPod files and it'll
-(hopefully) pop happily up and (you guessed it) tell you what you want to know.
+either "man ./goldenpod.1" or "perldoc ./goldenpod" in the directory containing
+the GoldenPod files and it'll (hopefully) pop happily up and (you guessed it)
+tell you what you want to know.
 
 If you find any bugs or have any suggestions, please do so at
 http://random.zerodogg.org/goldenpod/bugs. If you just want to contact me, you
