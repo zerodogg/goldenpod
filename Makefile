@@ -44,7 +44,6 @@ clean:
 # Verify syntax
 test:
 	@perl -c goldenpod
-	@perl -c devel-tools/SetVersion
 # Create a manpage from the POD
 man:
 	pod2man --name "goldenpod" --center "" --release "GoldenPod $(VERSION)" ./goldenpod ./goldenpod.1
