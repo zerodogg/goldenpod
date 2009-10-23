@@ -3,5 +3,3 @@ TODO for 0.9:
 	instead of using the old podcasts.log. Keep track of filenames -> feed
 	mappings there to avoid the (arguably extremely rare) case of a file getting
 	moved.
-- A --quick command-line option to allow a user to download a single file from
-	a feed, without having to add it permanently to goldenpod.

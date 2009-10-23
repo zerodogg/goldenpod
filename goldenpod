@@ -52,7 +52,7 @@ my (
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config, %ReturnVals);
 
 # Version number
-my $Version = '0.8.2';
+my $Version = '0.8.3';
 # Our user agent string
 my $UserAgent = 'GoldenPod/'.$Version.' (%OS%; podcatcher; Using %downloader%)';
 
@@ -175,6 +175,7 @@ sub Help
 	PrintHelp('-d', '--delete', 'Delete all other files in the target --copy directory');
 	PrintHelp('-o', '--rmold', 'Delete N old podcasts where N is 4 or the number supplied to --files');
 	PrintHelp('-i', '--ignore-pattern', 'Ignore filenames matching the regexp pattern supplied when downloading, copying or deleting podcasts.');
+	PrintHelp('','--quick','Download the first podcast found in the feed supplied to this parameter and exit');
 	PrintHelp('','--clean','Clean up the podcasts directory and catalogue.');
 	if ($all)
 	{
@@ -1902,6 +1903,7 @@ sub FuzzyParseFeed
 sub DownloadPodcasts
 {
 	my $DownloadThese = shift;
+	my $noTotal = shift;
 	my $NeedToDownload = scalar(@{$DownloadThese});
 	my @DownloadedFiles;
 	# Output the amount of files we need to download
@@ -1909,14 +1911,17 @@ sub DownloadPodcasts
 	{
 		print "\n";
 	}
-	print "Found a total of ";
-	if ($NeedToDownload > 1)
+	if(not $noTotal)
 	{
-		print "$NeedToDownload new podcasts to download.\n\n";
-	}
-	elsif($NeedToDownload == 1)
-	{
-		print "$NeedToDownload new podcast to download.\n\n";
+		print "Found a total of ";
+		if ($NeedToDownload > 1)
+		{
+			print "$NeedToDownload new podcasts to download.\n\n";
+		}
+		elsif($NeedToDownload == 1)
+		{
+			print "$NeedToDownload new podcast to download.\n\n";
+		}
 	}
 
 	# Open the logfile for writing
@@ -2040,6 +2045,71 @@ sub CreateCatalogue
 	}
 }
 
+# Purpose: Do a quick download from a feed
+# Usage: quickDownload(anything,URL);
+sub quickDownload
+{
+	shift;
+	my $URL = shift;
+
+	# Initialize
+	initDownload();
+	initDate();
+	PrepareLogging();
+	loadAlreadyDownloaded();
+
+	# Download data
+	my $Output = fetchURL($URL);
+
+	# Skip if we didn't recieve anything
+	exit if not $Output;
+
+	my $download;
+
+	my ($URLs, $Title) = FuzzyParseFeed($Output,'.',$URL);
+	my ($fURLs, $fTitle) = ParseFeed($Output);
+	
+	if(not @{$URLs} and not @{$fURLs})
+	{
+		die("No podcasts found in feed\n");
+	}
+	elsif(@{$URLs} > @{$fURLs} || @{$URLs} == @{$fURLs})
+	{
+		$download = shift(@{$URLs});
+	}
+	else
+	{
+		$download = shift(@{$fURLs});
+	}
+	if ($AlreadyDownloaded{$download})
+	{
+		print "\nGoldenPod has already downloaded the first podcast in this feed.\n";
+		print "Nothing to do.\n";
+		exit(0);
+	}
+	my $files = DownloadPodcasts([ $download ], true);
+	if(scalar(@{$files}))
+	{
+		CreateCatalogue($files);
+	}
+	exit(0);
+}
+
+sub loadAlreadyDownloaded
+{
+	# Load the %AlreadyDownloaded hash.
+	if ( -e $PodcastLog)
+	{
+		# Open the logfile containing previously downloaded files
+		open(my $LOGFILE, '<', $PodcastLog);
+		# Add them to a hash
+		%AlreadyDownloaded = map { chomp; $_=>1 } <$LOGFILE>;
+
+		# Close the logfile
+		close $LOGFILE;
+	}
+}
+
 # Purpose: Fetch and parse the feeds
 # Usage: FetchFeeds();
 sub FetchFeeds
@@ -2053,17 +2123,7 @@ sub FetchFeeds
 	# The list of podcasts to download in first-only mode
 	my @FirstOnly;
 
-	# Load the %AlreadyDownloaded hash.
-	if ( -e $PodcastLog)
-	{
-		# Open the logfile containing previously downloaded files
-		open(my $LOGFILE, '<', $PodcastLog);
-		# Add them to a hash
-		%AlreadyDownloaded = map { chomp; $_=>1 } <$LOGFILE>;
-
-		# Close the logfile
-		close $LOGFILE;
-	}
+	loadAlreadyDownloaded();
 
 	# Open the configuration file for reading
 	my $config = ParseList();
@@ -2158,9 +2218,9 @@ sub FetchFeeds
 	return(\@DownloadQueue);
 }
 
-# Purpose: The main function
-# Usage: main();
-sub main
+# Purpose: Initialize our $date var
+# Usage: initDate();
+sub initDate
 {
 	# Get the current date
 	{
@@ -2174,7 +2234,13 @@ sub main
 		# Finally, the date
 		$date = "$year-$mon-$mday";
 	}
+}
 
+# Purpose: The main function
+# Usage: main();
+sub main
+{
+	initDate();
 	# print \n if we're in verbose mode
 	printv("\n");
 
@@ -2356,6 +2422,7 @@ GetOptions (
 		print 'The files are using ', sprintf ('%.0f', $USED_DISKSPACE), " MB of diskspace\n";
 		exit 0 
 	},
+	'quick=s' => \&quickDownload,
 	# Display information about which config files and settings we would use
 	'dumpinfo' => sub { DumpInfo(); exit 0 },
 	'debuginfo' => sub { DumpInfo(1); exit 0 },
@@ -2519,6 +2586,12 @@ afterwards and remove those you want to download.  Implies B<--verbose>.
 Download the first file in any feed, and then permanently ignore the others.
 If you at any later point want to download older files, you will need to edit
 the logfile. Unlike --no-download this does not imply --verbose.
+
+=item B<--quick I<URL>>
+
+Download the first podcast found in URL and then exit. This can be useful
+for one-off downloads, or to just check out the latest episode of a podcast
+before adding a full subscription.
 
 =item B<-c, --copy I</path>>
 
