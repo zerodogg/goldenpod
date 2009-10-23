@@ -938,9 +938,10 @@ sub DeleteOldPodcasts
 	}
 	# Delete the files
 	my $DeletedFiles = 0;
-	while ($NumberOfFiles > $DeletedFiles) {
+	while ($NumberOfFiles > $DeletedFiles)
+	{
 		my $TargetBase = basename($FileList[0]);
-		if($IgnorePattern and not $TargetBase =~ /$IgnorePattern/)
+		if(not $IgnorePattern or not $TargetBase =~ /$IgnorePattern/)
 		{
 			# If we're in dry run mode then we don't want to actually do anything.
 			if ($DryRun_Mode)

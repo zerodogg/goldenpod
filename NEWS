@@ -1,5 +1,11 @@
 GoldenPod changelog
 
+0.8.3
+- - - -
+- Added --quick, allows you to fetch the first podcast in a feed without
+	having to add it to goldenpod
+- Fixed --rmold
+
 0.8.2
 - - - -
 - --ping now does feed autodiscovery if the recommended parser is
