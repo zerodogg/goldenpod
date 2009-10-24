@@ -2096,6 +2096,8 @@ sub quickDownload
 	exit(0);
 }
 
+# Purpose: Load the list of already downloaded podcasts into %AlreadyDownloaded
+# Usge: loadALreadyDownloaded();
 sub loadAlreadyDownloaded
 {
 	# Load the %AlreadyDownloaded hash.
