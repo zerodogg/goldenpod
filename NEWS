@@ -5,6 +5,7 @@ GoldenPod changelog
 - Added --quick, allows you to fetch the first podcast in a feed without
 	having to add it to goldenpod
 - Fixed --rmold
+- Now honors environment variables defining proxies when using LWP
 
 0.8.2
 - - - -

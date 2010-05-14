@@ -303,6 +303,8 @@ sub fetchURL
 			agent => $UserAgent.' libwwwperl',
 			requests_redirectable => [ 'GET', 'HEAD' ],
 		);
+		# Honor proxy settings in env
+		$UA->env_proxy();
 		my $response;
 
 		# if we have a target file then we just use ->mirror, that downloads
