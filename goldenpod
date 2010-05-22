@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # GoldenPod
-# Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009
+# Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -2637,8 +2637,8 @@ feed needs the fuzzy parser to work properly.
 
 Delete N old podcasts, where N is either 4 or optionally the value supplied to
 --files. Use this to free up some disk space taken up by old podcasts.  This
-will obey --ignore-pattern but not the $IgnorePattern configuration option. It
-will always leave at least the latest podcast.
+will obey --ignore-pattern but not the I<IgnorePattern> configuration option.
+It will always leave at least the latest podcast.
 
 =item B<-i, --ignore-pattern>
 
@@ -2713,7 +2713,7 @@ URL" syntax).
 =head1 HELP/SUPPORT
 
 If you need additional help, please visit the website at
-http://random.zerodogg.org/goldenpod
+L<http://random.zerodogg.org/goldenpod>
 
 =head1 DEPENDENCIES
 
@@ -2721,14 +2721,17 @@ Besides from perl it requires either LWP (preferred) or curl.
 
 =head1 INCOMPATIBILITIES
 
-This version of GoldenPod uses a new configuration syntax that is not backwards
-compatible with GoldenPod versions 0.1 to 0.6 (however it can upgrade the old
-configuration syntax to the new one). 0.6 and older also did not have support
-for fuzzy parsing (the "/REGEX/ URL" syntax) and will fail to download those
-entries.
+The configuration syntax changed in 0.7, and GoldenPod versions older than that
+will fail to read the current configuration file. 0.6 and older also did not
+have support for fuzzy parsing (the "/REGEX/ URL" syntax) and will fail to
+download those entries.
 
-The directories created by this version will always be YYYY-MM-DD, while 0.1 to
-0.6 could be YYYY-M-D.
+The directories created by 0.7 and older will always be YYYY-MM-DD, while 0.1
+to 0.6 could be YYYY-M-D.
+
+=head1 BUGS AND LIMITATIONS
+
+If you find a bug, please report it at L<http://random.zerodogg.org/goldenpod/bugs>
 
 =head1 AUTHOR
 
@@ -2768,7 +2771,7 @@ goldenpod is run.
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009
+Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
