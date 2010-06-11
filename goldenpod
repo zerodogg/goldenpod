@@ -2596,7 +2596,8 @@ the logfile. Unlike --no-download this does not imply --verbose.
 
 Download the first podcast found in URL and then exit. This can be useful
 for one-off downloads, or to just check out the latest episode of a podcast
-before adding a full subscription.
+before adding a full subscription. This will try both parsers, the one that
+finds the most will be used.
 
 =item B<-c, --copy I</path>>
 
