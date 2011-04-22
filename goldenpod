@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # GoldenPod
-# Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010
+# Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010, 2011
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -56,6 +56,11 @@ my $Version = '0.8.4';
 # Our user agent string
 my $UserAgent = 'GoldenPod/'.$Version.' (%OS%; podcatcher; Using %downloader%)';
 
+my %Has = (
+	LWP => 0,
+	curl => 0,
+	HTMLE => undef,
+);
 # The global date, as used in directory names, value set in main()
 my $date;
 
@@ -242,10 +247,6 @@ sub initDownload
 sub detectDownloader
 {
 	$downloadInitialized = true;
-	my %Has = (
-		LWP => 0,
-		curl => 0,
-	);
 	if(InPath('curl'))
 	{
 		$Has{curl} = 1;
@@ -671,6 +672,12 @@ sub DumpInfo
 		{
 			printf($pattern,'LWP','missing');
 		}
+		my $HTMLEV = 'missing';
+		if(eval('use HTML::Entities qw(decode_entities);1'))
+		{
+			$HTMLEV = $HTML::Entities::VERSION;
+		}
+		printf($pattern,'HTML::Entities',$HTMLEV);
 		printf($pattern, 'OS',GetDistVer());
 		eval('use Digest::MD5;');
 		my $md5 = Digest::MD5->new();
@@ -1602,6 +1609,33 @@ sub locateSourceInFeedList
 # Download and feed functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+# Purpose: Decode XML entities
+# Usage: decodedContent = decodeXMLentities(content);
+sub decodeXMLentities
+{
+	my $thing = shift;
+	if(not defined $Has{HTMLE})
+	{
+		if(eval('use HTML::Entities qw(decode_entities);1'))
+		{
+			$Has{HTMLE} = 1;
+		}
+		else
+		{
+			$Has{HTMLE} = 0;
+		}
+	}
+	if ($Has{HTMLE})
+	{
+		return decode_entities($thing);
+	}
+	else
+	{
+		$thing =~ s/\&amp;/\&/g;
+	}
+	return $thing;
+}
+
 # Purpose: Get the title from a string
 # Usage: title = ParseTitle(FEED_CONTENTS);
 sub ParseTitle
@@ -1794,6 +1828,7 @@ sub ParseFeed
 		my $quote = $CurrUrl;
 		$quote =~ s/.*url=(["']).*/$1/i;
 		$CurrUrl =~ s/.*url=$quote([^$quote]+)$quote.*/$1/i;
+		$CurrUrl = decodeXMLentities($CurrUrl);
 		# Filter away non-audio feeds if the user wants it.
 		if ($Config{PodcastFilter})
 		{
@@ -1891,6 +1926,7 @@ sub FuzzyParseFeed
 				$e = $URL.'/'.$e;
 			}
 		}
+		$e = decodeXMLentities($e);
 		# Done, add it to the list
 		if(not $URLList{$e})
 		{

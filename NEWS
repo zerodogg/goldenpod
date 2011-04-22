@@ -4,6 +4,8 @@ GoldenPod changelog
 - - - -
 - Fixed a bug that could cause podcasts downloaded with --quick to be
 	wrongly added (or not added) to the logfile
+- Fixed a problem that could cause some files from feeds that used XML
+	entities to fail to download
 
 0.8.3
 - - - -
