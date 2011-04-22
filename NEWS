@@ -1,5 +1,10 @@
 GoldenPod changelog
 
+0.8.4
+- - - -
+- Fixed a bug that could cause podcasts downloaded with --quick to be
+	wrongly added (or not added) to the logfile
+
 0.8.3
 - - - -
 - Added --quick, allows you to fetch the first podcast in a feed without

@@ -52,7 +52,7 @@ my (
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config, %ReturnVals);
 
 # Version number
-my $Version = '0.8.3';
+my $Version = '0.8.4';
 # Our user agent string
 my $UserAgent = 'GoldenPod/'.$Version.' (%OS%; podcatcher; Using %downloader%)';
 
@@ -1936,9 +1936,8 @@ sub DownloadPodcasts
 		if (not $DryRun_Mode)
 		{
 			print "Downloading $URL\n" if not $Verbose;
-			# Curl returns nonzero on failure
 			my $DownloadStatus = DownloadURL($Config{WorkingDir}.'/'.$date, $URL);
-			if($DownloadStatus)
+			if(not $DownloadStatus)
 			{
 				next;
 			}
