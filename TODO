@@ -1,5 +1,12 @@
+
 TODO for 0.9:
+- Handle 304 more gracefully
+- Add tests for duplicate downloads (if something has already been downloaded
+	as part of another feed, simply skip the download bit and go straight to
+	adding it to the logfile)
 - Rwrite the logfile system, taking more advantage of perl than currently
-	instead of using the old podcasts.log. Keep track of filenames -> feed
-	mappings there to avoid the (arguably extremely rare) case of a file getting
-	moved.
+	in addition to using the old podcasts.log. Keep track of filenames -> feed
+	mappings there to avoid the (arguably extremely rare) case of a file
+	getting moved. Use JSON when possible, storable otherwise. Migrate storable
+	to JSON if JSON becomes available.
+- Add [X/Y] to each line, X being current download, Y being total downloads
