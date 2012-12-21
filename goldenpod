@@ -342,7 +342,7 @@ sub fetchURL
 		# -k for insecure (allow ssl servers with odd certificates)
 		# -L to follow location hints
 		# -A sets the user agent string
-		my @CurlArgs = ( qw(-C -k -L -A),$UserAgent);
+		my @CurlArgs = ( qw(-C - -k -L -A),$UserAgent);
 		
 		# Set verbosity
 		if ($Verbose)
