@@ -410,8 +410,9 @@ sub DownloadURL
 	}
 	chdir($ToDir);
 
-	my $fileName = basename($URL);
-	if(fetchURL($URL,$fileName))
+	my @fileName = split('\?', basename($URL));
+
+	if(fetchURL($URL,$fileName[0]))
 	{
 		return true;
 	}
