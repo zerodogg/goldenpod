@@ -18,6 +18,8 @@
 # Force strict mode, and useful warnings
 use strict;
 use warnings;
+# Require perl 5.14 to get unicode_strings, say, //, package blocks
+use 5.014;
 
 # Make perl automatically die if any of these fails
 use Fatal qw/ open chdir mkdir close /;
@@ -52,7 +54,7 @@ my (
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config, %ReturnVals);
 
 # Version number
-my $Version = '0.8.4';
+my $Version = '0.9';
 # Our user agent string
 my $UserAgent = 'GoldenPod/'.$Version.' (%OS%; podcatcher; Using %downloader%)';
 
