@@ -196,7 +196,7 @@ sub Help
 # Purpose: Print version and warranty information
 # Usage: Version();
 sub Version
-{ 
+{
 	print "GoldenPod $Version\n";
 }
 
@@ -262,7 +262,7 @@ sub detectDownloader
 		eval('package GPLWP; our @ISA = qw(LWP::UserAgent); sub progress { shift; return main::LWPProgress(@_)};');
 		return;
 	}
-	
+
 	if(not $Has{LWP} and not $Has{curl})
 	{
 		die("Both LWP and curl are missing\n");
@@ -343,7 +343,7 @@ sub fetchURL
 		# -L to follow location hints
 		# -A sets the user agent string
 		my @CurlArgs = ( qw(-C - -k -L -A),$UserAgent);
-		
+
 		# Set verbosity
 		if ($Verbose)
 		{
@@ -747,7 +747,7 @@ sub SortedFileList
 {
 	my $FromDir = shift;
 	my (@SortedFileList, %FileCopyList);
-	
+
 	# For compatibility with older GoldenPods
 	my $CWD = getcwd();
 	chdir($FromDir);
@@ -1005,7 +1005,7 @@ sub CopyFiles
 	{
 		die "I can't write to the directory $CopyFilesTo!\n";
 	}
-	
+
 	# Figure out which files are the latest podcasts
 	# A sorted array of files
 	@FileList = SortedFileList("$Config{WorkingDir}/catalogue/All/");
@@ -1030,7 +1030,7 @@ sub CopyFiles
 	if ($CopyFiles_Delete)
 	{
 		# Time to delete files in the target directory
-		
+
 		# Babysitting the user :)
 		if($CopyFilesTo =~ m#^($ENV{HOME}(/|/Documents/?.*)|/(usr|var|dev|etc|lib|sbin|sys|boot|proc|opt)/?.*)$#)
 		{
@@ -1353,7 +1353,7 @@ sub ModeDetection
 # Purpose: Make us verbose
 # Usage: Arg_Verbose();
 sub Arg_Verbose
-{ 
+{
 	$Verbose = 1;
 	if(not $NoLog)
 	{
@@ -1817,7 +1817,7 @@ sub ParseFeed
 	my %URLList;
 	# We don't care about newlines
 	$FeedContents =~ s/(\r\n|\r|\n)/ /g;
-	
+
 	# Try to find the title of the podcast
 	my $FeedTitle = ParseTitle($FeedContents);
 
@@ -1876,10 +1876,10 @@ sub FuzzyParseFeed
 	my @URLs;
 	# This is used to avoid dupes in @URLs
 	my %URLList;
-	
+
 	# Try to find the title of the podcast
 	my $FeedTitle = ParseTitle($FeedContents);
-	
+
 	# Do some elaborate fuzzy parsing of the content
 	foreach my $e (split(/(\s+|<|>|\)|\(|"|')/,$FeedContents))
 	{
@@ -1900,7 +1900,7 @@ sub FuzzyParseFeed
 		# Only stuff matching
 		next if not $e =~ /$match/;
 		chomp($e);
-		
+
 		# If it's a relative URL, do some additional processing
 		if ($e =~ m{^/} or not $e =~ m{/})
 		{
@@ -1966,7 +1966,7 @@ sub DownloadPodcasts
 
 	# Open the logfile for writing
 	open(my $LOGFILE, '>>',$PodcastLog);
-	
+
 	# Download the podcasts
 	foreach my $URL (@{$DownloadThese})
 	{
@@ -2032,7 +2032,7 @@ sub CreateCatalogue
 	{
 		# We don't want to do anything to playlists
 		next if ($OrigName =~ /\.m3u$/);
-		
+
 		my $BaseName = basename($OrigName);
 		my ($Existed, $PodBaseName);
 		# Get the base name of the podcast
@@ -2108,7 +2108,7 @@ sub quickDownload
 
 	my ($URLs, $Title) = FuzzyParseFeed($Output,'.',$URL);
 	my ($fURLs, $fTitle) = ParseFeed($Output);
-	
+
 	if(not @{$URLs} and not @{$fURLs})
 	{
 		die("No podcasts found in feed\n");
@@ -2178,7 +2178,7 @@ sub FetchFeeds
 
 		# Download data
 		my $Output = fetchURL($podcast);
-		
+
 		# Skip if we didn't recieve anything
 		next if not $Output;
 
@@ -2226,16 +2226,16 @@ sub FetchFeeds
 		}
 	}
 
-	# If the config is empty, die.	
+	# If the config is empty, die.
 	if (not scalar(@{$config}))
 	{
 		die "The podcast list in $PodcastList is empty, nothing to do.\n";
 	}
-	
+
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	# Find out if we need to download anything
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-	
+
 
 	if($FirstOnly)
 	{
@@ -2433,7 +2433,7 @@ GetOptions (
 	},
 	'ping=s' => \&pingFeed,
 	'silent|s' => sub
-	{ 
+	{
 		$Verbose = 0;
 		if(not $NoLog == 2)
 		{
@@ -2462,7 +2462,7 @@ GetOptions (
 		}
 		$USED_DISKSPACE = $USED_DISKSPACE/1024/1024;
 		print 'The files are using ', sprintf ('%.0f', $USED_DISKSPACE), " MB of diskspace\n";
-		exit 0 
+		exit 0
 	},
 	'quick=s' => \&quickDownload,
 	# Display information about which config files and settings we would use
@@ -2486,7 +2486,7 @@ B<goldenpod> [I<OPTIONS>]
 =head1 DESCRIPTION
 
 B<GoldenPod> is a command-line podcast client (or podcast aggregator, or
-podcatcher, feel free to pick whichever name you want) written in perl. 
+podcatcher, feel free to pick whichever name you want) written in perl.
 
 It runs in either of two modes. The primary mode reads from configuration files
 in ~/.goldenpod, and saves podcasts to the directory defined there (by default
@@ -2567,7 +2567,7 @@ Be silent.
 Don't create a message logfile when in non-verbose mode. No effect unless in
 B<--silent> mode.
 
-=item B<-a, --add, --addfeed I<FEED> (I<REGEX>) > 
+=item B<-a, --add, --addfeed I<FEED> (I<REGEX>) >
 
 Add the feed URL supplied to goldenpod's feed list. Optionally you may supply
 a second parameter to this option, a regular expression. If this is present
