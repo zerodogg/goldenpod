@@ -206,6 +206,38 @@ sub Version
 # Download helpers
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+# GPLWP is a subclass of LWP::UserAgent that overrides the progress method in
+# order to output more useful progress messages from goldenpod.
+package GPLWP
+{
+    our @ISA = qw(LWP::UserAgent);
+    sub progress
+    {
+        shift;
+        no warnings 'once';
+        return if not $main::Verbose;
+        my ($status, $response) = @_;
+        $| = 1;
+        if ($status eq 'tick')
+        {
+            main::progressed();
+        }
+        elsif ($status eq 'begin')
+        {
+            main::progressed();
+        }
+        elsif ($status eq 'end')
+        {
+            return;
+        }
+        else
+        {
+            $status = int($status * 100);
+            main::iprint(sprintf('%-4s',$status.'%'));
+        }
+    }
+}
+
 # Purpsoe: Initialize the downloader
 # Usage: initDownload();
 sub initDownload
@@ -2445,38 +2477,6 @@ GetOptions (
 ) or die 'Run ', basename($0), " --help for help\n";
 
 main();
-
-# GPLWP is a subclass of LWP::UserAgent that overrides the progress method in
-# order to output more useful progress messages from goldenpod.
-package GPLWP
-{
-    our @ISA = qw(LWP::UserAgent);
-    sub progress
-    {
-        shift;
-        no warnings 'once';
-        return if not $main::Verbose;
-        my ($status, $response) = @_;
-        $| = 1;
-        if ($status eq 'tick')
-        {
-            main::progressed();
-        }
-        elsif ($status eq 'begin')
-        {
-            main::progressed();
-        }
-        elsif ($status eq 'end')
-        {
-            return;
-        }
-        else
-        {
-            $status = int($status * 100);
-            main::iprint(sprintf('%-4s',$status.'%'));
-        }
-    }
-}
 __END__
 =encoding utf8
 
