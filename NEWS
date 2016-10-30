@@ -5,6 +5,7 @@ GoldenPod changelog
 - Major code cleanups
 - Removed bashpodder compatibility support
 - Removed support for reading config files from ./
+- Removed support for automatically upgrading config files older than 0.7
 
 0.8.4
 - - - -

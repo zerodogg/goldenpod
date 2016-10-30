@@ -1213,37 +1213,12 @@ sub InitGlobalConfig
 		InitConfigDir();
 	}
 	my %OptionRegexHash = (
-			# Old-style (pre 0.7) settings
-			'$WorkingDir' => '.',
-			'$DefaultVerbosity' => '.',
-			'$IgnorePattern' => '.',
-			'$PodcastFilter' => '.',
-
-			# New-style 0.7+
-			# TODO: At some point accept true/TRUE/false/FALSE/yes/YES/no/NO/1/0 instead of just 1/0
 			WorkingDir => '.',
 			DefaultVerbosity => '0|1',
 			PodcastFilter => '0|1',
 		);
 
 	LoadConfigFile($UserConfigDir.'/goldenpod.conf', \%Config, \%OptionRegexHash);
-	if(defined($Config{'$WorkingDir'}))
-	{
-		print 'Migrating old configuration format...';
-		foreach (qw#$WorkingDir $DefaultVerbosity $IgnorePattern $PodcastFilter#)
-		{
-			my $OptName = $_;
-			print '.';
-			my $Opt = $Config{$OptName};
-			$Opt =~ s/^\"(.*)\"\s*;?$/$1/;
-			delete($Config{$OptName});
-			$OptName =~ s/^\$(\w+)\s*/$1/;
-			$Config{$OptName} = $Opt;
-		}
-		print '.';
-		WriteGPConfig();
-		print "done\n";
-	}
 	return(1);
 }
 
