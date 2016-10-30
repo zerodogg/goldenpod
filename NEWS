@@ -1,5 +1,11 @@
 GoldenPod changelog
 
+0.9.0
+- - - -
+- Major code cleanups
+- Removed bashpodder compatibility support
+- Removed support for reading config files from ./
+
 0.8.4
 - - - -
 - Fixed a problem that could cause some files from feeds that used XML
