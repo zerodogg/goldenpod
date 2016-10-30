@@ -571,7 +571,7 @@ sub GetDistVer
 		}
 	}
 	# GNU/Linux and BSD
-	foreach(qw/mandriva mandrakelinux mandrake fedora redhat red-hat ubuntu debian gentoo suse distro dist slackware freebsd openbsd netbsd dragonflybsd NULL/)
+	foreach(qw/arch mandriva mandrakelinux mandrake fedora redhat red-hat ubuntu debian gentoo suse distro dist slackware freebsd openbsd netbsd dragonflybsd NULL/)
 	{
 		if (-e "/etc/$_-release" or -e "/etc/$_-version" or -e "/etc/${_}_version" or $_ eq 'NULL') {
 			my ($DistVer, $File, $VERSION_FILE);
@@ -594,6 +594,7 @@ sub GetDistVer
 				$DistVer = <$VERSION_FILE>;
 			}
 			close($VERSION_FILE);
+            $DistVer //= '';
 			chomp($DistVer);
 			return("/etc/$File: $DistVer");
 		}
