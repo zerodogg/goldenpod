@@ -41,20 +41,49 @@ use IPC::Open2;
 use constant { true => 1, false => 0 };
 # Allow bundling of options with GeteOpt
 Getopt::Long::Configure ('bundling', 'prefix_pattern=(--|-)');
-
-# Global scalars
-my (
-	$PodcastList,	$Verbose,	$NoDownload,
-	$NoLog,		$FirstOnly,	$CopyFiles_Delete,
-	$UserConfigDir,	$IgnorePattern,
-	$RemoveOldFiles,$DryRun_Mode,	$CopyFilesTo,
-	$FileNumber,	$PodcastLog
-);
-# Global hashes
-my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config, %ReturnVals);
-
 # Version number
 my $Version = '0.9';
+
+# The path to our podcast list config file
+my $PodcastList;
+# Our verbosity
+my $Verbose = 0;
+# When set to any true value this disables logging. When set to 2 it
+# disables logging and directs all of our output to /dev/null
+my $NoLog = 0;
+# When set to true, goldenpod will only download the first entry in a feed
+my $FirstOnly = 0;
+# When set to true, goldenpod will not download anything at all, but will
+# add all entries in all feeds to its list of already downloaded files.
+my $NoDownloadMode = 0;
+# When set to true, goldenpod will delete files when in --copy mode
+my $CopyFiles_Delete = 0;
+# The path to our config dir, set by initialize()
+my $UserConfigDir;
+# If true, enables dry-run mode
+my $DryRun_Mode = 0;
+# A regex used to ignore files, either from the config or --ignore-pattern
+my $IgnorePattern;
+# Where to copy files to when in --copy mode
+my $CopyFilesTo;
+# True if we should delete old podcasts
+my $RemoveOldFiles = 0;
+# The number of --files to --copy or --rmold
+my $FileNumber = undef;
+# The path to the podcast logfile
+my $PodcastLog;
+
+# Our config
+my %Config;
+# Return values that are captured by our SIGCHLD handler
+my %ReturnVals;
+# Contains a list of already downloaded podcasts
+my %AlreadyDownloaded;
+# Contains a list of podcasts to be added to our "already downloaded" list
+my %NoDownload;
+# Podcast feed names used to populate the catalogue
+my %PodNames;
+
 # Our user agent string
 my $UserAgent = 'GoldenPod/'.$Version.' (%OS%; podcatcher; Using %downloader%)';
 
@@ -2168,10 +2197,10 @@ sub FetchFeeds
 
 	# If we're in NoDownload or FirstOnly mode, copy the contents of the URLs array into the
 	# NoDownload hash.
-	if($NoDownload or $FirstOnly)
+	if($NoDownloadMode or $FirstOnly)
 	{
 		%NoDownload = map { $_ => 1 } @PodcastsAvailable;
-		if($NoDownload)
+		if($NoDownloadMode)
 		{
 			PerformNoDownload();
 			exit(0);
@@ -2256,7 +2285,7 @@ sub main
 	printv("\n");
 
 	# Conflicting commandline arguments
-	if ($FirstOnly and $NoDownload)
+	if ($FirstOnly and $NoDownloadMode)
 	{
 		die "Conflicting options: --first-only and --no-download. Please read --help\n";
 	}
@@ -2345,7 +2374,7 @@ GetOptions (
 	'version' => sub { Version(); exit 0},
 	'help|h' => sub { Help(); exit 0; },
 	'help-all' => sub { Help(1); exit 0; },
-	'no-download|nodownload|w' => sub { Arg_Verbose(); $NoDownload = 1 },
+	'no-download|nodownload|w' => sub { Arg_Verbose(); $NoDownloadMode = 1 },
 	'dry-run|dryrun|u' => sub { Arg_Verbose(); $DryRun_Mode = 1},
 	'first-only|firstonly|first|f' => \$FirstOnly,
 	'nolog|l' => sub { $NoLog = 2},
