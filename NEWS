@@ -6,6 +6,7 @@ GoldenPod changelog
 - Removed bashpodder compatibility support
 - Removed support for reading config files from ./
 - Removed support for automatically upgrading config files older than 0.7
+- Removed --dumpinfo (is now an alias to --debuginfo)
 
 0.8.4
 - - - -

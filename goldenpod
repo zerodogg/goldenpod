@@ -215,8 +215,7 @@ sub Help
 	PrintHelp('','--clean','Clean up the podcasts directory and catalogue.');
 	if ($all)
 	{
-		PrintHelp('', '--dumpinfo', 'Print the files goldenpod would work with');
-		PrintHelp('', '--debuginfo', 'The same as --dumpinfo, but also includes some additional system information');
+		PrintHelp('', '--debuginfo', 'Print the files goldenpod works with and some system information');
 		PrintHelp('-l', '--nolog', 'Don\'t create a message logfile when in silent mode.');
 		PrintHelp('', '--prefer-curl', 'Prefer to use curl for downloading if available, instead of LWP (curl is used by default if LWP is missing)');
 		PrintHelp('', '--fuzzydump URL', 'Dump the list of files found by the fuzzy parser in URL. See the manpage for more information');
@@ -690,7 +689,6 @@ sub GetDistVer
 sub DumpInfo
 {
     initialize('util');
-	my $debugInfo = shift;
 	Version();
 	print "\n";
 	my $pattern = "%-28s: %s\n";
@@ -702,40 +700,37 @@ sub DumpInfo
 	}
 	printf($pattern, 'List of downloaded podcasts',$PodcastLog);
 	printf($pattern, 'Target download directory',$Config{WorkingDir});
-	if($debugInfo)
-	{
-		printf($pattern, 'Perl version', sprintf('%vd',$^V));
-		# Don't output useless "used only once, possible typo" warnings
-		no warnings 'once';
-		if (eval('use LWP;use LWP::UserAgent;1;'))
-		{
-			printf($pattern,'LWP version',$LWP::VERSION);
-			printf($pattern,'LWP::UserAgent version',$LWP::UserAgent::VERSION);
-		}
-		else
-		{
-			printf($pattern,'LWP','missing');
-		}
-		my $HTMLEV = 'missing';
-		if(eval('use HTML::Entities qw(decode_entities);1'))
-		{
-			$HTMLEV = $HTML::Entities::VERSION;
-		}
-		printf($pattern,'HTML::Entities',$HTMLEV);
-		printf($pattern, 'OS',GetDistVer());
-		eval('use Digest::MD5;');
-		my $md5 = Digest::MD5->new();
-		my $self = $0;
-		if(not -f $self)
-		{
-			$self = InPath($self);
-		}
-		open(my $f,'<',$self);
-		$md5->addfile($f);
-		my $digest = $md5->hexdigest;
-		close($f);
-		printf($pattern,'MD5',$digest);
-	}
+    printf($pattern, 'Perl version', sprintf('%vd',$^V));
+    # Don't output useless "used only once, possible typo" warnings
+    no warnings 'once';
+    if (eval('use LWP;use LWP::UserAgent;1;'))
+    {
+        printf($pattern,'LWP version',$LWP::VERSION);
+        printf($pattern,'LWP::UserAgent version',$LWP::UserAgent::VERSION);
+    }
+    else
+    {
+        printf($pattern,'LWP','missing');
+    }
+    my $HTMLEV = 'missing';
+    if(eval('use HTML::Entities qw(decode_entities);1'))
+    {
+        $HTMLEV = $HTML::Entities::VERSION;
+    }
+    printf($pattern,'HTML::Entities',$HTMLEV);
+    printf($pattern, 'OS',GetDistVer());
+    eval('use Digest::MD5;');
+    my $md5 = Digest::MD5->new();
+    my $self = $0;
+    if(not -f $self)
+    {
+        $self = InPath($self);
+    }
+    open(my $f,'<',$self);
+    $md5->addfile($f);
+    my $digest = $md5->hexdigest;
+    close($f);
+    printf($pattern,'MD5',$digest);
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2435,8 +2430,7 @@ GetOptions (
 	},
 	'quick=s' => \&quickDownload,
 	# Display information about which config files and settings we would use
-	'dumpinfo' => sub { DumpInfo(); exit 0 },
-	'debuginfo' => sub { DumpInfo(1); exit 0 },
+	'dumpinfo|debuginfo' => sub { DumpInfo(1); exit 0 },
 	'prefer-curl|prefercurl' => sub { $downloader = 'curl' },
 ) or die 'Run ', basename($0), " --help for help\n";
 
@@ -2565,15 +2559,11 @@ available, and falls back to curl if LWP is missing. This parameter reverses
 this behaviour, using curl if it is available and falling back to LWP if curl
 is missing.
 
-=item B<--dumpinfo>
-
-Print the configuration and podcast list filenames that GoldenPod would read,
-in addition to the logfiles it would use and write to.
-
 =item B<--debuginfo>
 
-The same as --dumpinfo, but also includes some additional information that is
-useful to debug problems. Include the output of this with any bug report.
+Print the configuration and podcast list filenames that GoldenPod would read,
+in addition to the logfiles it would use and write to. Additionally it includes
+some information about versions of libraries and utilities that gpgpwd uses.
 
 =item B<--stats>
 
