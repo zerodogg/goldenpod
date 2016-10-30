@@ -48,7 +48,7 @@ my (
 	$NoLog,		$FirstOnly,	$CopyFiles_Delete,
 	$UserConfigDir,	$IgnorePattern,
 	$RemoveOldFiles,$DryRun_Mode,	$CopyFilesTo,
-	$FileNumber,	$PodcastLog, $downloadInitialized,
+	$FileNumber,	$PodcastLog
 );
 # Global hashes
 my (%AlreadyDownloaded, %NoDownload, %PodNames, %Config, %ReturnVals);
@@ -242,19 +242,23 @@ package GPLWP
 # Usage: initDownload();
 sub initDownload
 {
-	return if $downloadInitialized;
+    state $downloadInitialized = 0;
+    if ($downloadInitialized)
+    {
+        return;
+    }
 	detectDownloader();
 	my $os = [uname()]->[0];
 	$os = $os eq 'Linux' ? 'GNU/Linux' : $os;
 	$UserAgent =~ s/%OS%/$os/g;
 	$UserAgent =~ s/%downloader%/$downloader/g;
+    $downloadInitialized = 1;
 }
 
 # Purpose: Detect our downloader
 # Usage: detectDownloader();
 sub detectDownloader
 {
-	$downloadInitialized = true;
 	if(InPath('curl'))
 	{
 		$Has{curl} = 1;
@@ -290,6 +294,9 @@ sub detectDownloader
 # the content;
 sub fetchURL
 {
+    # Initialize the downloader if needed
+    initDownload();
+
 	my $URL = shift;
 	my $targetFile = shift;
 
@@ -1684,7 +1691,6 @@ sub pingFeed
 {
 	shift; my $url = shift;
 	my $secondTry = shift;
-	initDownload();
 	my $Output = fetchURL($url);
 	exit if not $Output;
 	my ($URLs, $Title) = ParseFeed($Output,'.',$url);
@@ -2098,7 +2104,6 @@ sub quickDownload
 	my $URL = shift;
 
 	# Initialize
-	initDownload();
 	initDate();
 	PrepareLogging();
 	loadAlreadyDownloaded();
@@ -2347,8 +2352,6 @@ sub main
 
 	# First prepare logging.
 	PrepareLogging();
-	# Initialize our downloader
-	initDownload();
 	# Then fetch and parse our feeds.
 	my $DownloadQueue = FetchFeeds();
 	if(scalar(@{$DownloadQueue}) == 0)
@@ -2402,7 +2405,6 @@ GetOptions (
 	'rmold|o' => \$RemoveOldFiles,
 	'fuzzydump=s' => sub {
 		shift; my $url = shift;
-		initDownload();
 		my $Output = fetchURL($url);
 		exit if not $Output;
 		my ($URLs, $Title) = FuzzyParseFeed($Output,'.',$url);
@@ -2420,7 +2422,6 @@ GetOptions (
 	},
 	'rssdump=s' => sub {
 		shift; my $url = shift;
-		initDownload();
 		my $Output = fetchURL($url);
 		exit if not $Output;
 		my ($URLs, $Title) = ParseFeed($Output,'.',$url);
