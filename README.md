@@ -1,6 +1,4 @@
--------------------------------------------------------------------------------
-GoldenPod - a podcast client in perl
--------------------------------------------------------------------------------
+# GoldenPod - a podcast client in perl
 
 For installation instructions see the INSTALL file.
 
