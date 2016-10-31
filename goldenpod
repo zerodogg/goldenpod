@@ -37,6 +37,8 @@ use File::Copy;
 use POSIX qw(uname);
 # open() call to commands
 use IPC::Open2;
+# Used to store our downloaded state
+use JSON::PP;
 # Using true/false is easier to read than 0/1
 use constant { true => 1, false => 0 };
 # Allow bundling of options with GeteOpt
@@ -72,17 +74,26 @@ my $RemoveOldFiles = 0;
 my $FileNumber = undef;
 # The path to the podcast logfile
 my $PodcastLog;
+# Internal application state
+my $state = {
+    # The list of downloaded podcasts
+    downloaded => {
+        _VERSION => 1
+    },
+    # Additional metadata of said podcasts
+    meta => {
+        _VERSION => 1,
+        files => {},
+    },
+    # If the downloaded list has been modified, this will be set to true.
+    # This will trigger goldenpod to write the list.
+    downloadedDirty => 0,
+};
 
 # Our config
 my %Config;
 # Return values that are captured by our SIGCHLD handler
 my %ReturnVals;
-# Contains a list of already downloaded podcasts
-my %AlreadyDownloaded;
-# Contains a list of podcasts to be added to our "already downloaded" list
-my %NoDownload;
-# Podcast feed names used to populate the catalogue
-my %PodNames;
 
 # Our user agent string
 my $UserAgent = 'GoldenPod/'.$Version.' (%OS%; podcatcher; Using %downloader%)';
@@ -179,6 +190,7 @@ sub PrintHelp
 # Usage: Help();
 sub Help
 {
+    initialize('util');
 	$PodcastLog =~ s/$ENV{HOME}/~/;
 	my $all = shift;
 	Version();
@@ -368,6 +380,10 @@ sub fetchURL
 		}
 		if(not $response->is_success)
 		{
+            if ($response->code == 304 && $targetFile)
+            {
+                return 1;
+            }
 			warn("Download of $URL failed: ".$response->status_line."\n");
 			return;
 		}
@@ -454,7 +470,7 @@ sub DownloadURL
 
 	if(fetchURL($URL,$fileName[0]))
 	{
-		return true;
+        return (true,$fileName[0]);
 	}
 	else
 	{
@@ -465,6 +481,50 @@ sub DownloadURL
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Helper functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: Read in a file, returning its contents or erroring out
+# Usage: $content = slurpFile($file);
+sub slurpFile
+{
+    my $file = shift;
+    open(my $in,'<',$file) || die('Failed to open '.$file.' for reading: '.$!);
+    local $/ = undef;
+    my $contents = <$in> || die('Failed to read from '.$file.': '.$!);
+    close($in) || warn('Warning: failed to close filehandle for '.$file.': '.$!);
+    return $contents;
+}
+
+# Purpose: Write out a file, DYING if it fails
+# Usage: writeFile($file,$content);
+sub writeFile
+{
+    my $file = shift;
+    my $content = shift;
+    open(my $out,'>:encoding(UTF-8)',$file) || die('Failed to open '.$file.' for writing'.$!);
+    print {$out} $content || die('Failed to write from '.$file.': '.$!);
+    close($out) || warn('Warning: failed to close filehandle for '.$file.': '.$!);
+    return;
+}
+
+# Purpose: Check if a file has already been downloaded
+sub hasAlreadyBeenDownloaded
+{
+    my $feed = shift // '';
+    my $file = shift;
+    if(defined $state->{downloaded}->{$feed})
+    {
+        if(defined $state->{downloaded}->{$feed}->{$file})
+        {
+            return 1;
+        }
+    }
+    # Check the __GLOBAL__ namespace as well
+    if ($feed ne '__GLOBAL__')
+    {
+        return hasAlreadyBeenDownloaded('__GLOBAL__',$file);
+    }
+    return;
+}
 
 # Purpose: A print that removes previous text before printing. Used for status Information messages.
 # Usage: iprint(text);
@@ -731,33 +791,6 @@ sub DumpInfo
     my $digest = $md5->hexdigest;
     close($f);
     printf($pattern,'MD5',$digest);
-}
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# NoDownload routine
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-# Purpose: Adds all items in %NoDownload to the logfile
-# Usage: PerformNoDownload();
-sub PerformNoDownload
-{
-	if(not $FirstOnly)
-	{
-		printv("\nWriting older podcasts to the logfile...");
-	}
-	open(my $LOGFILE, '>>',$PodcastLog);
-	foreach (keys (%NoDownload))
-	{
-		if(not $AlreadyDownloaded{$_})
-		{
-			print $LOGFILE $_."\n";
-		}
-	}
-	if(not $FirstOnly)
-	{
-		printv(" done\n");
-	}
-	close($LOGFILE);
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1530,6 +1563,126 @@ sub locateSourceInFeedList
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# State functions (read/modify/write)
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Purpose: Load our state into $state
+# Usge: loadState()
+sub loadState
+{
+    state $loadedState = 0;
+    return if $loadedState;
+    if (-e $UserConfigDir.'/downloaded.json')
+    {
+        $state->{downloaded} = decode_json( slurpFile($UserConfigDir.'/downloaded.json') );
+    }
+    elsif (-e $PodcastLog)
+	{
+        my $oldData = slurpFile($PodcastLog);
+        $state->{downloaded}->{'__GLOBAL__'} //= {};
+        foreach my $entry(split(/\n/,$oldData))
+        {
+            $state->{downloaded}->{'__GLOBAL__'}->{$entry} = {};
+        }
+        $state->{downloadedDirty} = 1;
+	}
+    if (-e $UserConfigDir.'/meta.json')
+    {
+        $state->{meta} = decode_json( slurpFile($UserConfigDir.'/meta.json') );
+    }
+    $loadedState = 1;
+}
+
+# Purpose: Write any dirty state to disk
+sub writeDirtyState
+{
+    if ($state->{downloadedDirty})
+    {
+        my $json = JSON::PP->new;
+        $json->pretty;
+        $state->{downloaded}->{'_VERSION'} = 1;
+        writeFile($UserConfigDir.'/downloaded.json',$json->encode($state->{downloaded}));
+        $state->{downloadedDirty} = 0;
+    }
+    if ($state->{metaDirty})
+    {
+        my $json = JSON::PP->new;
+        $json->pretty;
+        $state->{meta}->{'_VERSION'} = 1;
+        writeFile($UserConfigDir.'/meta.json',$json->encode($state->{meta}));
+        $state->{metaDirty} = 0;
+    }
+}
+
+# Purpose: Add an entry to the titles table in the metadata state
+sub addMetadataTitle
+{
+    my $feed = shift;
+    my $title = shift;
+    if (!defined $title || !defined $feed)
+    {
+        return;
+    }
+    $state->{meta}->{titles}->{$feed} //= {
+        current => undef,
+    };
+    $state->{meta}->{titles}->{$feed}->{historical} //= [];
+    my $oldCurrent = $state->{meta}->{titles}->{$feed}->{current};
+    $state->{meta}->{titles}->{$feed}->{current} = $title;
+    if(defined $oldCurrent && $oldCurrent ne $title)
+    {
+        push(@{ $state->{meta}->{titles}->{$feed}->{historical} },$oldCurrent);
+    }
+    $state->{metaDirty} = 1;
+}
+
+# Purpose: Append an entry to the list of downloaded podcasts
+sub appendToDownloadedList
+{
+    my $feed = shift;
+    my $file = shift;
+    my $outputFile = shift;
+    my $when = shift // time;
+    $state->{downloaded}->{$feed} //= {};
+    $state->{downloaded}->{$feed}->{$file} //= {
+        when => $when
+    };
+    $state->{downloadedDirty} = 1;
+    if(defined $outputFile)
+    {
+        $state->{meta}->{files}->{$outputFile} = {
+            from => $feed,
+        };
+        $state->{metaDirty} = 1;
+    }
+    # FIXME: Shouldn't write on each append
+    writeDirtyState();
+}
+
+# Purpose: Resolve the "podcast name" for a file
+sub getPodcastNameFromMeta
+{
+    my $file = shift;
+    # Resolve the filename
+    my $origPath = $file;
+    if (-l $file)
+    {
+        $origPath = readlink($file);
+    }
+    my @components = split('/',$origPath);
+    my $resolvedName = $components[-2].'/'.$components[-1];
+    if (my $resolved = $state->{meta}->{files}->{$resolvedName})
+    {
+        my $feed = $resolved->{from};
+        if ($feed && defined $state->{meta}->{titles}->{$feed})
+        {
+            return $state->{meta}->{titles}->{$feed}->{current};
+        }
+    }
+    return;
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Download and feed functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -1727,6 +1880,7 @@ sub locateFeed
 sub ParseFeed
 {
 	my $FeedContents = shift;
+    my $feedURL = shift;
 
 	if(not $FeedContents)
 	{
@@ -1762,8 +1916,8 @@ sub ParseFeed
 		{
 			next if basename($CurrUrl) =~ /$IgnorePattern/;
 		}
-		# Add the title string to the PodNames array (if we have found the title)
-		$PodNames{$CurrUrl} = $FeedTitle;
+        # Store the title string in our metadata
+        addMetadataTitle($feedURL,$FeedTitle);
 		if(not $URLList{$CurrUrl})
 		{
 			push(@URLs, $CurrUrl);
@@ -1886,18 +2040,15 @@ sub DownloadPodcasts
 		}
 	}
 
-	# Open the logfile for writing
-	open(my $LOGFILE, '>>',$PodcastLog);
-
 	# Download the podcasts
-	foreach my $URL (@{$DownloadThese})
+	foreach my $entry (@{$DownloadThese})
 	{
+        my $URL = $entry->{url};
 		if (not $DryRun_Mode)
 		{
 			print "Downloading $URL\n" if not $Verbose;
-			# Curl returns nonzero on failure
-			my $DownloadStatus = DownloadURL($Config{WorkingDir}.'/'.$date, $URL);
-			if($DownloadStatus)
+			my ($DownloadStatus,$outFileName) = DownloadURL($Config{WorkingDir}.'/'.$date, $URL);
+			if(!$DownloadStatus)
 			{
 				next;
 			}
@@ -1905,19 +2056,13 @@ sub DownloadPodcasts
 			{
 				push(@DownloadedFiles, $URL);
 			}
-			print $LOGFILE "$URL\n";
-			# If we're in --first-only we add it to $AlreadyDownloaded{$URL} so that NoDownload doesn't add it
-			if ($FirstOnly and $DownloadStatus)
-			{
-				$AlreadyDownloaded{$URL} = 1;
-			}
+            appendToDownloadedList($entry->{feed},$URL,$date.'/'.$outFileName);
 		}
 		else
 		{
 			print "Would download $URL\n";
 		}
 	}
-	close($LOGFILE);
 	return(\@DownloadedFiles);
 }
 
@@ -1950,19 +2095,18 @@ sub CreateCatalogue
 	mkpath($Config{WorkingDir}.'/catalogue/All');
 
 	# For every file, make sure it has a catalogue entry.
+    # FIXME: This should know more about the podcast than what we do here, ie. where
+    # it was saved, to properly query the metadata store.
 	foreach my $OrigName (@{$Downloaded})
 	{
 		# We don't want to do anything to playlists
 		next if ($OrigName =~ /\.m3u$/);
 
 		my $BaseName = basename($OrigName);
-		my ($Existed, $PodBaseName);
+		my ($Existed);
 		# Get the base name of the podcast
-		if ($PodNames{$OrigName})
-		{
-			$PodBaseName = $PodNames{$OrigName};
-		}
-		else
+        my $PodBaseName = getPodcastNameFromMeta($OrigName);
+        if (!$PodBaseName)
 		{
 			$PodBaseName = $BaseName;
 			# If we couldn't get the podcast name from the feed then try even
@@ -1977,6 +2121,7 @@ sub CreateCatalogue
 			{
 				$PodBaseName = 'Unknown';
 			}
+            # FIXME: The name that we "made up" here should be added to the state storage
 		}
 		mkpath($Config{WorkingDir}.'/catalogue/'.$PodBaseName);
 		# We don't want to do anything if it already exists
@@ -2026,7 +2171,7 @@ sub quickDownload
 	my $download;
 
 	my ($URLs, $Title) = FuzzyParseFeed($Output,'.',$URL);
-	my ($fURLs, $fTitle) = ParseFeed($Output);
+	my ($fURLs, $fTitle) = ParseFeed($Output,$URL);
 
 	if(not @{$URLs} and not @{$fURLs})
 	{
@@ -2040,7 +2185,7 @@ sub quickDownload
 	{
 		$download = shift(@{$fURLs});
 	}
-	if ($AlreadyDownloaded{$download})
+	if (hasAlreadyBeenDownloaded('',$download))
 	{
 		print "\nGoldenPod has already downloaded the first podcast in this feed.\n";
 		print "Nothing to do.\n";
@@ -2052,23 +2197,6 @@ sub quickDownload
 		CreateCatalogue($files);
 	}
 	exit(0);
-}
-
-# Purpose: Load the list of already downloaded podcasts into %AlreadyDownloaded
-# Usge: loadALreadyDownloaded();
-sub loadAlreadyDownloaded
-{
-	# Load the %AlreadyDownloaded hash.
-	if ( -e $PodcastLog)
-	{
-		# Open the logfile containing previously downloaded files
-		open(my $LOGFILE, '<', $PodcastLog);
-		# Add them to a hash
-		%AlreadyDownloaded = map { chomp; $_=>1 } <$LOGFILE>;
-
-		# Close the logfile
-		close $LOGFILE;
-	}
 }
 
 # Purpose: Fetch and parse the feeds
@@ -2084,7 +2212,7 @@ sub FetchFeeds
 	# The list of podcasts to download in first-only mode
 	my @FirstOnly;
 
-	loadAlreadyDownloaded();
+	loadState();
 
 	# Open the configuration file for reading
 	my $config = ParseList();
@@ -2109,7 +2237,7 @@ sub FetchFeeds
 		}
 		else
 		{
-			($URLs, $Title) = ParseFeed($Output);
+			($URLs, $Title) = ParseFeed($Output,$podcast);
 		}
 
 		# Push those URLs not already downloaded into @PodcastsAvailable,
@@ -2117,16 +2245,16 @@ sub FetchFeeds
 		my $newP = 0;
 		foreach my $url (@{$URLs})
 		{
-			if(not $AlreadyDownloaded{$url})
+            if (!hasAlreadyBeenDownloaded('',$url))
 			{
-				push(@PodcastsAvailable, $url);
+				push(@PodcastsAvailable, { feed => $podcast, url => $url });
 				if (not $match or $url =~ /$match/)
 				{
 					$newP++;
 				}
 			}
 		}
-		push(@FirstOnly, ${$URLs}[0]) if $newP;
+		push(@FirstOnly, { feed => $podcast, url => @{$URLs}[0]}) if $newP;
 		if ($newP == 0)
 		{
 			if(scalar(@{$URLs}) > 0)
@@ -2169,10 +2297,16 @@ sub FetchFeeds
 	# NoDownload hash.
 	if($NoDownloadMode or $FirstOnly)
 	{
-		%NoDownload = map { $_ => 1 } @PodcastsAvailable;
-		if($NoDownloadMode)
+		if(!$NoDownloadMode)
 		{
-			PerformNoDownload();
+            shift(@PodcastsAvailable);
+        }
+        foreach my $entry (@PodcastsAvailable)
+        {
+            appendToDownloadedList($entry->{feed},$entry->{url},undef,0);
+        }
+        if ($NoDownloadMode)
+        {
 			exit(0);
 		}
 	}
@@ -2244,7 +2378,7 @@ sub initialize
         PrepareLogging();
     }
     # Load our alredy downloaded files
-	loadAlreadyDownloaded();
+	loadState();
 }
 
 # Purpose: The main function
@@ -2326,11 +2460,6 @@ sub main
 	if(scalar(@{$Downloaded}))
 	{
 		CreateCatalogue($Downloaded);
-		# NoDownload if in --first-only
-		if($FirstOnly)
-		{
-			PerformNoDownload();
-		}
 	}
 }
 
