@@ -1268,7 +1268,7 @@ sub WriteGPConfig
 		$Config{PodcastFilter} = 0;
 	}
 	my %Explanations = (
-		WorkingDir => "The directory the podcasts will be downloaded to.\n# This is only used if ./podcasts.conf and ./bp.conf doesn't exist.\n# If one of those exists then WorkingDir will become ./",
+		WorkingDir => "The directory the podcasts will be downloaded to.\n"
 		DefaultVerbosity => "How verbose GoldenPod should be by default (commandline arguments overrides this)\n# 1 means be verbose (default), 0 means be silent",
 		IgnorePattern => "A regular expression pattern that GoldenPod should ignore when downloading or copying\n# podcasts. It will be applied to the filename. See the manpage for more information about it.\n# --ignore-pattern overrides this setting, and --rmold only obeys --ignore-pattern, not this configuration setting.",
 		PodcastFilter => "If GoldenPod should ignore non-audio files in the feeds\n# 0 means don't ignore (default), 1 means ignore.",
@@ -2580,15 +2580,8 @@ B<goldenpod> [I<OPTIONS>]
 B<GoldenPod> is a command-line podcast client (or podcast aggregator, or
 podcatcher, feel free to pick whichever name you want) written in perl.
 
-It runs in either of two modes. The primary mode reads from configuration files
-in ~/.goldenpod, and saves podcasts to the directory defined there (by default
-~/Podcasts/) The other mode supports just getting thrown into a directory where
-BashPodder used to be and replacing it automagically, or having its config
-files in the same directory as itself and then just being run from a random
-location and detecting and performing a chdir correctly.  This, along with
-being able to run in silent mode by simply adding -s or changing the
-corresponding option in the configuration file makes GoldenPod both
-cron-friendly and user-friendly.
+It reads from configuration files in ~/.goldenpod, and saves podcasts to
+the directory defined there (by default ~/Podcasts/).
 
 =head1 BASIC USE
 
@@ -2867,9 +2860,9 @@ B<GoldenPod> is written by Eskild Hustvedt I<<code aatt zerodogg d0t org>>
 
 =over
 
-=item I<~/.goldenpod/podcasts.conf> or I<./podcasts.conf>
+=item I<~/.goldenpod/podcasts.conf>
 
-The file containing a list of podcast feeds, alternatively I<./bp.conf>
+The file containing a list of podcast feeds.
 
 =item I<~/.goldenpod/goldenpod.conf>
 
@@ -2877,12 +2870,11 @@ The configuration file for GoldenPod, which contains the location to save
 streams to, your desired verbosity level, the default IgnorePattern and if you
 want to use the PodcastFilter.
 
-=item I<~/.goldenpod/podcasts.log> or I<./podcasts.log>
+=item I<~/.goldenpod/podcasts.log>
 
-The logfile containing the URLs for the podcasts already downloaded.  This file
-will be I<podcast.log> if working in bashpodder compatibility mode.
+The logfile containing the URLs for the podcasts already downloaded.
 
-=item I<~/.goldenpod/goldenpod.log> or I<./goldenpod.log>
+=item I<~/.goldenpod/goldenpod.log>
 
 The logfile written to when in silent mode.
 
