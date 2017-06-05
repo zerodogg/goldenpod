@@ -1268,7 +1268,7 @@ sub WriteGPConfig
 		$Config{PodcastFilter} = 0;
 	}
 	my %Explanations = (
-		WorkingDir => "The directory the podcasts will be downloaded to.\n"
+		WorkingDir => "The directory the podcasts will be downloaded to.\n",
 		DefaultVerbosity => "How verbose GoldenPod should be by default (commandline arguments overrides this)\n# 1 means be verbose (default), 0 means be silent",
 		IgnorePattern => "A regular expression pattern that GoldenPod should ignore when downloading or copying\n# podcasts. It will be applied to the filename. See the manpage for more information about it.\n# --ignore-pattern overrides this setting, and --rmold only obeys --ignore-pattern, not this configuration setting.",
 		PodcastFilter => "If GoldenPod should ignore non-audio files in the feeds\n# 0 means don't ignore (default), 1 means ignore.",
