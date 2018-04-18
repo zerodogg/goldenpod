@@ -1582,6 +1582,243 @@ sub locateSourceInFeedList
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# A simple perl implementation of parts of the gpodder.net API
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+package gpodderNetSync
+{
+    # This object uses old-school perl OO (manually blessed objects) in order
+    # to avoid non-core deps. It doesn't actually do anything fancy, so for
+    # our use, this is fine.
+
+    # This implements v2 API methods. It returns RAW decoded JSON data from the API
+    # where that is possible, so to find the syntax of the returned data, see the
+    # API documentation on https://gpoddernet.readthedocs.io/en/latest/api/index.html
+
+    use JSON::PP;
+    use Sys::Hostname;
+
+    # Purpose: Create a new gpodderNetSync object
+    # Usage: object = gpodderNetSync->new( USERNAME, PASSWORD, DELTA TIMESTAMP );
+    #
+    # The DELTA TIMESTAMP is the latest timestamp from using the getChangedSubscriptions or
+    # uploadChangedSubscriptions methods.
+    sub new
+    {
+        my $class = shift;
+        my $username = shift;
+        my $password = shift;
+        my $deltaTimestamp = shift;
+        if (!defined $deltaTimestamp)
+        {
+            $deltaTimestamp = 0;
+        }
+
+        eval('use LWP::UserAgent;1;') or die('LWP::UserAgent is missing');
+        my $lwp = LWP::UserAgent->new(
+            agent => $UserAgent.' libwwwperl',
+            requests_redirectable => [ 'GET', 'HEAD' ],
+        );
+        $lwp->credentials("gpodder.net:443",undef,$username,$password);
+        $lwp->cookie_jar( {} );
+
+        return bless {
+            user => $username,
+            password => $password,
+            cookie => undef,
+            LWP => $lwp,
+            authenticated => 0,
+            deviceid => 'goldenpod-'.hostname,
+            deltaTimestamp => $deltaTimestamp,
+        }, $class;
+    }
+
+    # Purpose: Qualify URLs, prefixing the domain and optionally the API version
+    # Usage: url = object->_qualifyURL(URL, bare?)
+    # The bare parameter is a boolean, if true then the /api/2 prefix will be omitted.
+    sub _qualifyURL
+    {
+        shift;
+        my $url = shift;
+        my $bare = shift;
+        if ($bare)
+        {
+            return "https://gpodder.net".$url;
+        }
+        else
+        {
+            return "https://gpodder.net/api/2".$url;
+        }
+    }
+
+    # Purpose: Decode JSON if provided
+    # This is a wrapper around decode_json that, in addition to JSON, also
+    # accepts an empty string (and returns an empty object in that case). This
+    # is because the API often returns an empty string instead of an empty JSON
+    # object when something succeds that doesn't need more feedback than HTTP
+    # already provides.
+    sub _fromJSON
+    {
+        my $self = shift;
+        my $data = shift;
+        if ($data =~ /\S/)
+        {
+            return decode_json($data);
+        }
+        return {};
+    }
+
+    # Purpose: Perform a HTTP PUT request
+    sub _put
+    {
+        my $self = shift;
+        my $url = shift;
+        my $content = shift;
+        my @params = @_;
+
+        my $res = $self->{LWP}->put($url, Content => $content, @params);
+        if ($res->is_success)
+        {
+            return $self->_fromJSON( $res->decoded_content );
+        }
+        else
+        {
+            die("Error performing PUT on ".$url.": ".$res->status_line);
+        }
+    }
+
+    # Purpose: Perform a HTTP GET request
+    sub _get
+    {
+        my $self = shift;
+        my $url = shift;
+
+        my $res = $self->{LWP}->get($url);
+        if ($res->is_success)
+        {
+            return $self->_fromJSON( $res->decoded_content );
+        }
+        else
+        {
+            die("Error performing GET on ".$url.": ".$res->status_line);
+        }
+    }
+
+    # Purpose: Perform a HTTP POST request
+    sub _post
+    {
+        my $self = shift;
+        my $url = shift;
+        my $data = shift;
+
+        my $res = $self->{LWP}->post($url, Content => $data);
+        if ($res->is_success)
+        {
+            return $self->_fromJSON( $res->decoded_content );
+        }
+        else
+        {
+            die("Error performing POST on ".$url.": ".$res->status_line);
+        }
+    }
+
+    # Purpose: Authenticate with gpodder.net
+    sub _authenticate
+    {
+        my $self = shift;
+        $self->_post(
+            $self->_qualifyURL('/auth/'.$self->{user}.'/login.json')
+        );
+        $self->{authenticated} = 1;
+        $self->_post(
+            $self->_qualifyURL('/devices/'.$self->{user}.'/'.$self->{deviceid}.'.json'),
+            encode_json({
+                    caption => 'GoldenPod on '.hostname
+                })
+        );
+        return 1;
+    }
+
+    # Purpose: Perform authentication with gpodder.net if we haven't already done so
+    sub _authenticateIfNeeded
+    {
+        my $self = shift;
+        if (defined $self->{authenticated})
+        {
+            return $self->_authenticate();
+        }
+        return 1;
+    }
+
+    # Purpose: Update our internal deltaTimestamp if the data provided contains an updated one
+    sub _updateTimestamp
+    {
+        my $self = shift;
+        my $json = shift;
+        if (defined $json && ref $json && defined $json->{timestamp})
+        {
+            $self->{deltaTimestamp} = $json->{timestamp};
+        }
+    }
+
+    # Purpose: Retrieve a list of all subscriptions from the API
+    sub getSubscriptions
+    {
+        my $self = shift;
+        $self->_authenticateIfNeeded();
+        return $self->_get(
+            $self->_qualifyURL('/subscriptions/'.$self->{user}.'/'.$self->{deviceid}.'.json', 1)
+        );
+    }
+
+    # Purpose: Upload a complete, new list of subcriptions for this device
+    sub uploadSubscriptions
+    {
+        my $self = shift;
+        $self->_authenticateIfNeeded();
+        my @list = @_;
+
+        my $subs = join("\n",@list);
+
+        return $self->_put(
+            $self->_qualifyURL('/subscriptions/'.$self->{user}.'/'.$self->{deviceid}.'.txt',1),
+            $subs
+        );
+    }
+
+    # Purpose: Upload subscription changes for this device
+    # Usage: object->uploadChangedSubscriptions( $changes );
+    # $changes is a hash reference, see https://gpoddernet.readthedocs.io/en/latest/api/reference/subscriptions.html#upload-subscription-changes for its syntax
+    sub uploadChangedSubscriptions
+    {
+        my $self = shift;
+        $self->_authenticateIfNeeded();
+        my $changes = shift;
+
+        my $result = $self->_post(
+            $self->_qualifyURL('/subscriptions/'.$self->{user}.'/'.$self->{deviceid}.'.json'),
+            encode_json($changes)
+        );
+
+        $self->_updateTimestamp( $result );
+        return $result;
+    }
+
+    # Purpose: Retrieve subscription changes since the current timestamp
+    # See https://gpoddernet.readthedocs.io/en/latest/api/reference/subscriptions.html#get-subscription-changes for the format of the returned data
+    sub getChangedSubscriptions
+    {
+        my $self = shift;
+        $self->_authenticateIfNeeded();
+
+        my $result = $self->_get(
+            $self->_qualifyURL('/subscriptions/'.$self->{user}.'/'.$self->{deviceid}.'.json?since='.$self->{deltaTimestamp})
+        );
+        $self->_updateTimestamp( $result );
+        return $result;
+    }
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # State functions (read/modify/write)
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
