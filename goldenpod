@@ -1247,6 +1247,13 @@ sub InitGlobalConfig
 		);
 
 	LoadConfigFile($UserConfigDir.'/goldenpod.conf', \%Config, \%OptionRegexHash);
+    # Upgrades the config to include the gpodder.net options, if needed
+    if (!defined $Config{gpodderNetUser})
+    {
+        $Config{gpodderNetUser} = '';
+        $Config{gpodderNetPassword} = '';
+        WriteGPConfig();
+    }
 	return(1);
 }
 
@@ -1272,6 +1279,8 @@ sub WriteGPConfig
 		DefaultVerbosity => "How verbose GoldenPod should be by default (commandline arguments overrides this)\n# 1 means be verbose (default), 0 means be silent",
 		IgnorePattern => "A regular expression pattern that GoldenPod should ignore when downloading or copying\n# podcasts. It will be applied to the filename. See the manpage for more information about it.\n# --ignore-pattern overrides this setting, and --rmold only obeys --ignore-pattern, not this configuration setting.",
 		PodcastFilter => "If GoldenPod should ignore non-audio files in the feeds\n# 0 means don't ignore (default), 1 means ignore.",
+        gpodderNetUser => "The username for your gpodder.net account,\n# if you want goldenpod to sync with it",
+        gpodderNetPassword => "The password for your gpodder.net account,\n# if you want goldenpod to sync with it",
 		HEADER => "GoldenPod configuration file\n# DO NOT put feed URLs in this file. Those go in podcasts.conf",
 	);
 	# Write the actual file
