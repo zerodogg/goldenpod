@@ -1208,8 +1208,8 @@ sub LoadConfigFile
 		chomp;
 		my $Option = $_;
 		my $Value = $_;
-		$Option =~ s/^\s*(\S+)\s*=.*/$1/;
-		$Value =~ s/^\s*\S+\s*=\s*(.*)\s*/$1/;
+		$Option =~ s/^\s*([^=]+)\s*=.*/$1/;
+		$Value =~ s/^\s*[^=]+\s*=\s*(.*)\s*/$1/;
 		if($OnlyValidOptions) {
 			unless(defined($OptionRegex->{$Option})) {
 				warn("Unknown configuration option \"$Option\" (=$Value) in $File: Ignored.");
