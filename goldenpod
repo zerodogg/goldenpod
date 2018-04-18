@@ -80,10 +80,14 @@ my $state = {
     downloaded => {
         _VERSION => 1
     },
-    # Additional metadata of said podcasts
+    # Additional metadata, including gpodder.net state
     meta => {
         _VERSION => 1,
         files => {},
+        # gpodder.net metadata
+        gpodder => {
+            delta => 0
+        }
     },
     # If the downloaded list has been modified, this will be set to true.
     # This will trigger goldenpod to write the list.
@@ -760,6 +764,12 @@ sub DumpInfo
 	}
 	printf($pattern, 'List of downloaded podcasts',$PodcastLog);
 	printf($pattern, 'Target download directory',$Config{WorkingDir});
+    my $gpodderNetMode = 'off';
+    if (length($Config{gpodderNetUser}) && length($Config{gpodderNetPassword}))
+    {
+        $gpodderNetMode = 'on';
+    }
+    printf($pattern, 'gpodder.net integration',$gpodderNetMode);
     printf($pattern, 'Perl version', sprintf('%vd',$^V));
     # Don't output useless "used only once, possible typo" warnings
     no warnings 'once';
@@ -1484,6 +1494,7 @@ sub addFeed
 	}
 	else
 	{
+        goldenpodGpodderNetAction('add',$feed);
 		print "Added the feed $feed\n";
 	}
 	if ($sources)
@@ -1535,6 +1546,7 @@ sub removeFeed
 	my $removed = removeFeedFromList($feed);
 	if ($removed)
 	{
+        goldenpodGpodderNetAction('remove',$feed);
 		print "Removed the feed \"$feed\".\n";
 	}
 	else
@@ -1588,6 +1600,82 @@ sub locateSourceInFeedList
 		return;
 	}
 	return \@sources;
+}
+
+# Purpose: Perform an action with gpodder.net if needed/possible
+# This is a thin wrapper around the gpodderNetSync object, which also updates
+# our local state if needed.
+sub goldenpodGpodderNetAction
+{
+    if (!length($Config{gpodderNetUser}) || !length($Config{gpodderNetPassword}))
+    {
+        return;
+    }
+
+    my $gpodder = gpodderNetSync->new(
+        $Config{gpodderNetUser},
+        $Config{gpodderNetPassword},
+        $state->{meta}->{gpodder}->{delta}
+    );
+
+    my $action = shift;
+
+    if ($action eq 'remove' || $action eq 'add')
+    {
+        my $change = {
+            $action => [ shift ]
+        };
+        my $res = $gpodder->uploadChangedSubscriptions( $change );
+        # FIXME: It returns a list of URLs that it wants us to update. We need
+        # to handle these.
+        $state->{meta}->{gpodder}->{delta} = $res->{timestamp};
+        $state->{metaDirty} = 1;
+    }
+    elsif ($action eq 'push')
+    {
+        my $feeds = ParseList();
+        my @allNormal;
+        foreach my $feed (@{$feeds})
+        {
+            if (!$feed->{match})
+            {
+                push(@allNormal,$feed->{podcast});
+            }
+        }
+        $gpodder->uploadSubscriptions(
+            @allNormal
+        );
+    }
+    elsif ($action eq 'sync')
+    {
+        my $changes = $gpodder->getChangedSubscriptions();
+        if(defined $changes->{add})
+        {
+            foreach my $added (@{ $changes->{add} })
+            {
+                # addFeedToList will return 0 if the entry was successfully added,
+                # this is because it returns the number of *duplicates* found
+                if (!addFeedToList($added))
+                {
+                    say "gpodder.net sync - added: $added";
+                }
+            }
+        }
+        if(defined $changes->{remove})
+        {
+            foreach my $removed (@{ $changes->{remove} })
+            {
+                if (removeFeedFromList($removed))
+                {
+                    say "gpodder.net sync - removed: $removed";
+                }
+            }
+        }
+        $state->{meta}->{gpodder}->{delta} = $changes->{timestamp};
+        $state->{metaDirty} = 1;
+    }
+
+    writeDirtyState();
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2754,6 +2842,23 @@ GetOptions (
 	'files|n=s' => \$FileNumber,
 	'delete|d' => \$CopyFiles_Delete,
 	'rmold|o' => \$RemoveOldFiles,
+    'gpodder-push' => sub
+    {
+        initialize('util'),
+        goldenpodGpodderNetAction('push');
+        exit(0);
+    },
+    'gpodder-sync' => sub
+    {
+        initialize('full'),
+        goldenpodGpodderNetAction('sync');
+    },
+    'gpodder-sync-only' => sub
+    {
+        initialize('util'),
+        goldenpodGpodderNetAction('sync');
+        exit(0);
+    },
 	'fuzzydump=s' => sub {
 		shift; my $url = shift;
 		my $Output = fetchURL($url);
