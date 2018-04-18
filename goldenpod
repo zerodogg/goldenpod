@@ -3003,6 +3003,8 @@ any parameters.
 
 =head1 OPTIONS
 
+=head2 Basic
+
 =over
 
 =item B<-h, --help>
@@ -3021,6 +3023,18 @@ Be silent.
 
 Don't create a message logfile when in non-verbose mode. No effect unless in
 B<--silent> mode.
+
+=item B<--debuginfo>
+
+Print the configuration and podcast list filenames that GoldenPod would read,
+in addition to the logfiles it would use and write to. Additionally it includes
+some information about versions of libraries and utilities that gpgpwd uses.
+
+=back
+
+=head2 Subscription management
+
+=over
 
 =item B<-a, --add, --addfeed I<FEED> (I<REGEX>) >
 
@@ -3044,25 +3058,35 @@ This downloads URL and parses it once with each parser, then tells you
 which parser it recommends that you to use. It will also attempt feed
 autodiscovery if the URL is not an RSS feed.
 
+=item B<--fuzzydump I<URL>>
+
+This uses the GoldenPod fuzzy parser to list audio files found in I<URL>.
+The fuzzy parser is the one invoked when using the "/REGEX/ URL" syntax
+in the podcasts.conf file (ie. to fetch podcasts from a non-RSS source).
+
+You can use this to see if GoldenPod finds anything in the URL, and
+to find out what your /REGEX/ for the URL should be.
+
+=item B<--rssdump I<URL>>
+
+This uses the GoldenPod standard/RSS parser to list files found in I<URL>.
+
+You can use this to see if GoldenPod finds anything in the URL. It is mostly
+useful to find out if GoldenPod has problems parsing a feed, or if a certain
+feed needs the fuzzy parser to work properly.
+
+=back
+
+=head2 Download options
+
+=over
+
 =item B<--prefer-curl>
 
 Prefer to use curl over LWP if present. GoldenPod uses LWP by default if it is
 available, and falls back to curl if LWP is missing. This parameter reverses
 this behaviour, using curl if it is available and falling back to LWP if curl
 is missing.
-
-=item B<--debuginfo>
-
-Print the configuration and podcast list filenames that GoldenPod would read,
-in addition to the logfiles it would use and write to. Additionally it includes
-some information about versions of libraries and utilities that gpgpwd uses.
-
-=item B<--stats>
-
-Print some simple statistics: How many files you currently have in your
-catalogue, which file is the latest, which file is the oldest and how much
-space they are using.
-
 =item B<-u, --dry-run>
 
 Used along with --copy or --rmold. Just display what would be done, don't
@@ -3087,48 +3111,6 @@ for one-off downloads, or to just check out the latest episode of a podcast
 before adding a full subscription. This will try both parsers, the one that
 finds the most will be used.
 
-=item B<-c, --copy I</path>>
-
-Copy the last N downloaded files to /path/ and delete the other files in
-/path/.  This is very useful for synchronizing the latest podcasts with your
-MP3 player.  N is either 4 by default or optionally the value supplied to
---files.
-
-=item B<-d, --delete>
-
-For use with --copy, delete all files in /path/ unless they are one of the
-files we are about to copy. It will not allow you to delete files directly in
-your home directory (but all subdirectories except Documents) nor any files in
-/usr /var /dev /etc /lib /sbin /sys /boot or /proc.
-
-=item B<-n, --files I<N>>
-
-For use with --copy or --rmold. Copy/delete N files instead of 4.
-
-=item B<--fuzzydump I<URL>>
-
-This uses the GoldenPod fuzzy parser to list audio files found in I<URL>.
-The fuzzy parser is the one invoked when using the "/REGEX/ URL" syntax
-in the podcasts.conf file (ie. to fetch podcasts from a non-RSS source).
-
-You can use this to see if GoldenPod finds anything in the URL, and
-to find out what your /REGEX/ for the URL should be.
-
-=item B<--rssdump I<URL>>
-
-This uses the GoldenPod standard/RSS parser to list files found in I<URL>.
-
-You can use this to see if GoldenPod finds anything in the URL. It is mostly
-useful to find out if GoldenPod has problems parsing a feed, or if a certain
-feed needs the fuzzy parser to work properly.
-
-=item B<-o, --rmold>
-
-Delete N old podcasts, where N is either 4 or optionally the value supplied to
---files. Use this to free up some disk space taken up by old podcasts.  This
-will obey --ignore-pattern but not the I<IgnorePattern> configuration option.
-It will always leave at least the latest podcast.
-
 =item B<-i, --ignore-pattern>
 
 Ignore files matching the regular expression pattern supplied when downloading
@@ -3142,11 +3124,48 @@ expression is case sensitive.  If you would like to match both Foo and foo you
 could do: "--ignore-pattern [f|F]oo".  --ignore-pattern supports standard perl
 regular expressions (will be executed within m//).
 
+=back
+
+=head2 Collection management
+
+=over
+
+=item B<-c, --copy I</path>>
+
+Copy the last N downloaded files to /path/ and delete the other files in
+/path/.  This is very useful for synchronizing the latest podcasts with your
+MP3 player.  N is either 4 by default or optionally the value supplied to
+--files. This option also obeys I<--ignore-pattern>.
+
+=item B<-d, --delete>
+
+For use with --copy, delete all files in /path/ unless they are one of the
+files we are about to copy. It will not allow you to delete files directly in
+your home directory (but all subdirectories except Documents) nor any files in
+/usr /var /dev /etc /lib /sbin /sys /boot or /proc.
+
+=item B<-n, --files I<N>>
+
+For use with --copy or --rmold. Copy/delete N files instead of 4.
+
+=item B<-o, --rmold>
+
+Delete N old podcasts, where N is either 4 or optionally the value supplied to
+--files. Use this to free up some disk space taken up by old podcasts.  This
+will obey --ignore-pattern but not the I<IgnorePattern> configuration option.
+It will always leave at least the latest podcast.
+
 =item B<--clean>
 
 Clean up the podcasts directory and catalogue. This is useful if you removed
 files by hand. It will remove empty directories, remove orphaned symlinks in
 the catalogue and rewrite playlists. This is also done after --rmold.
+
+=item B<--stats>
+
+Print some simple statistics: How many files you currently have in your
+catalogue, which file is the latest, which file is the oldest and how much
+space they are using.
 
 =back
 
