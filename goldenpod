@@ -1467,21 +1467,7 @@ sub addFeed
 		print "If you did not intend to add it, use this command to remove it:\n";
 		print "  goldenpod --remove \"$feed\"\n\n";
 	}
-	my $feeds = ParseList();
-	my $sources = locateSourceInFeedList($feed,$feeds);
-	if ($sources)
-	{
-		foreach my $i (@{$sources})
-		{
-			$feeds->[$i] = undef;
-		}
-	}
-	push(@{$feeds}, {
-			podcast => $feed,
-			match => $pattern,
-			comments => ['# Added: '.scalar(localtime)],
-		});
-	WriteList($feeds);
+    my $sources = addFeedToList($feed,$pattern);
 
 	if ($pattern)
 	{
@@ -1505,12 +1491,54 @@ sub addFeed
 	exit(0);
 }
 
+# Purpose: Add a single feed to the feed list
+sub addFeedToList
+{
+    my $feed = shift;
+    my $pattern = shift;
+	my $feeds = ParseList();
+	my $sources = locateSourceInFeedList($feed,$feeds);
+	if ($sources)
+	{
+		foreach my $i (@{$sources})
+		{
+			$feeds->[$i] = undef;
+		}
+	}
+    # FIXME: Don't overwrite existing entries, keep the first one, remove the
+    # rest if needed. This avoids bad "Added:" labels.
+	push(@{$feeds}, {
+			podcast => $feed,
+			match => $pattern,
+			comments => ['# Added: '.scalar(localtime)],
+		});
+	WriteList($feeds);
+    return $sources;
+}
+
 # Purpose: Handle --removefeed to remove a feed
 # Usage: \&removeFeed in GetOptions
 sub removeFeed
 {
 	shift;
     initialize('util');
+	my $feed = shift;
+	my $removed = removeFeedFromList($feed);
+	if ($removed)
+	{
+		print "Removed the feed \"$feed\".\n";
+	}
+	else
+	{
+		print "The feed \"$feed\" was not found.\n";
+		exit(1);
+	}
+	exit(0);
+}
+
+# Purpose: Remove a single feed from the feed list
+sub removeFeedFromList
+{
 	my $feed = shift;
 	my $feeds = ParseList();
 	my $sources = locateSourceInFeedList($feed,$feeds);
@@ -1524,16 +1552,7 @@ sub removeFeed
 		}
 	}
 	WriteList($feeds);
-	if ($removed)
-	{
-		print "Removed the feed \"$feed\".\n";
-	}
-	else
-	{
-		print "The feed \"$feed\" was not found.\n";
-		exit(1);
-	}
-	exit(0);
+    return $removed;
 }
 
 # Purpose: Check if a feed contains instances of the supplied source,
