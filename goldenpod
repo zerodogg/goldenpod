@@ -3169,6 +3169,28 @@ space they are using.
 
 =back
 
+=head2 gpodder.net synchronization
+
+See also the GPODDER.NET section below
+
+=over
+
+=item B<--gpodder-push>
+
+Push all subscriptions to gpodder.net, overwriting any previously uploaded
+subscriptions that have been uploaded by goldenpod from the current host.
+
+=item B<--gpodder-sync>
+
+Perform a sync with gpodder.net and then proceed to download new podcasts as
+normal.
+
+=item B<--gpodder-sync-only>
+
+Perform a sync with gpodder.net and then exit.
+
+=back
+
 =head1 PARSERS
 
 GoldenPod comes with two different feed parsers.
@@ -3196,6 +3218,23 @@ regular expression a single "." (without the quotes) to make it match them all).
 To use the fuzzy parser, supply a regular expression as the second parameter
 to I<--add> (or, if you edit the podcasts.conf file by hand, use the "/regex/
 URL" syntax).
+
+=head1 GPODDER.NET
+
+I<gpodder.net> is a podcast subscription synchronization service. GoldenPod can sync
+your subscriptions with this service, so that for instance your podcast client on
+your phone stays up to date with the subscriptions you have in GoldenPod.
+
+To enable sync with gpodder.net you must edit I<goldenpod.conf> to add your
+gpodder.net username and password, and then run I<goldenpod --gpodder-push> once
+to upload your current subscriptions. Then whenever you do I<goldenpod --add> or
+I<goldenpod --remove>, GoldenPod will push those changes to gpodder.net as well.
+
+To pull down changes that have been made on gpodder.net or in other podcast
+clients that you have chosen to synchronize with GoldenPod, run either
+I<goldenpod --gpodder-sync> which will first sync with gpodder.net and then
+proceed to download new podcasts as normal, or I<goldenpod --gpodder-sync-only>
+which will sync with gpodder.net and then exit.
 
 =head1 EXAMPLE podcasts.conf
 
@@ -3257,7 +3296,8 @@ The file containing a list of podcast feeds.
 
 The configuration file for GoldenPod, which contains the location to save
 streams to, your desired verbosity level, the default IgnorePattern and if you
-want to use the PodcastFilter.
+want to use the PodcastFilter, as well as you gpodder.net username and password
+if you wish to use gpodder.net integraton.
 
 =item I<~/.goldenpod/podcasts.log>
 
