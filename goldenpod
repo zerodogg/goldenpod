@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # GoldenPod
-# Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010, 2011
+# Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010, 2017, 2018
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -3318,7 +3318,7 @@ goldenpod is run.
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010
+Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010, 2017, 2018
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
