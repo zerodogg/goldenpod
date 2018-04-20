@@ -1271,6 +1271,7 @@ sub InitGlobalConfig
     # Upgrades the config to include the gpodder.net options, if needed
     if (!defined $Config{gpodderNetUser})
     {
+        printd('Upgraded config for gpodder.net options'."\n");
         $Config{gpodderNetUser} = '';
         $Config{gpodderNetPassword} = '';
         WriteGPConfig();
@@ -1663,9 +1664,11 @@ sub goldenpodGpodderNetAction
 
     if ($action eq 'remove' || $action eq 'add')
     {
+        my $feed = shift;
         my $change = {
-            $action => [ shift ]
+            $action => [ $feed ]
         };
+        printd('gpodder.net: '.$action.' '.$feed."\n");
         my $res = $gpodder->uploadChangedSubscriptions( $change );
         # FIXME: It returns a list of URLs that it wants us to update. We need
         # to handle these.
@@ -1683,12 +1686,14 @@ sub goldenpodGpodderNetAction
                 push(@allNormal,$feed->{podcast});
             }
         }
+        printd('gpodder.net: pushing all subscriptions'."\n");
         $gpodder->uploadSubscriptions(
             @allNormal
         );
     }
     elsif ($action eq 'sync')
     {
+        printd('gpodder.net: downloading subscriptions'."\n");
         my $changes = $gpodder->getChangedSubscriptions();
         if(defined $changes->{add})
         {
