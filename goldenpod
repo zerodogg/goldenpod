@@ -2874,7 +2874,7 @@ GetOptions (
 	'nolog|l' => sub { $NoLog = 2},
 	'copy|c=s'=> \$CopyFilesTo,
 	'clean' => sub {
-        initialize(),
+        initialize('util'),
 		CleanupDirs();
 		exit(0);
 	},
