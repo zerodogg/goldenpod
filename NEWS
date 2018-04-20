@@ -7,6 +7,8 @@ GoldenPod changelog
 - Removed support for reading config files from ./
 - Removed support for automatically upgrading config files older than 0.7
 - Removed --dumpinfo (is now an alias to --debuginfo)
+- Replaced the flat-file download log with a JSON log that contains additional metadata
+- Added a separate meta storage file to aid in keeping a sane catalogue
 
 0.8.4
 - - - -
