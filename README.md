@@ -12,7 +12,7 @@ not then type either "man ./goldenpod.1" or "perldoc ./goldenpod".
 
 ## Bug reports
 
-If you find a bug, please report it at L<https://www.zerodogg.org/goldenpod/bugs>
+If you find a bug, please report it at https://www.zerodogg.org/goldenpod/bugs
 
 ## Installation instructions
 
@@ -31,5 +31,4 @@ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License along with
-goldenpod. If not, see
-[http://www.gnu.org/licenses/](http://www.gnu.org/licenses/).
+goldenpod. If not, see http://www.gnu.org/licenses/.
