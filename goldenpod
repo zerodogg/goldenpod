@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # GoldenPod
-# Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010, 2011
+# Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010, 2017, 2018
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -78,10 +78,14 @@ my $state = {
     downloaded => {
         _VERSION => 1
     },
-    # Additional metadata of said podcasts
+    # Additional metadata, including gpodder.net state
     meta => {
         _VERSION => 1,
         files => {},
+        # gpodder.net metadata
+        gpodder => {
+            delta => 0
+        }
     },
     # If the downloaded list has been modified, this will be set to true.
     # This will trigger goldenpod to write the list.
@@ -573,6 +577,17 @@ sub printv
 	}
 }
 
+# Purpose: print() something if debug output is enabled
+# Usage: printd(OPTS);
+#  OPTS are identical to print();
+sub printd
+{
+    if ($Verbose >= 99)
+    {
+        print('Debug: ',@_);
+    }
+}
+
 # Purpose: Get the path to the logfile
 # Usage: logfile = GetLogFile();
 sub GetLogFile
@@ -756,6 +771,12 @@ sub DumpInfo
 		printf($pattern, 'Logfile',GetLogFile());
 	}
 	printf($pattern, 'Target download directory',$Config{WorkingDir});
+    my $gpodderNetMode = 'off';
+    if (length($Config{gpodderNetUser}) && length($Config{gpodderNetPassword}))
+    {
+        $gpodderNetMode = 'on';
+    }
+    printf($pattern, 'gpodder.net integration',$gpodderNetMode);
     printf($pattern, 'Perl version', sprintf('%vd',$^V));
     # Don't output useless "used only once, possible typo" warnings
     no warnings 'once';
@@ -1204,8 +1225,8 @@ sub LoadConfigFile
 		chomp;
 		my $Option = $_;
 		my $Value = $_;
-		$Option =~ s/^\s*(\S+)\s*=.*/$1/;
-		$Value =~ s/^\s*\S+\s*=\s*(.*)\s*/$1/;
+		$Option =~ s/^\s*([^=]+)\s*=.*/$1/;
+		$Value =~ s/^\s*[^=]+\s*=\s*(.*)\s*/$1/;
 		if($OnlyValidOptions) {
 			unless(defined($OptionRegex->{$Option})) {
 				warn("Unknown configuration option \"$Option\" (=$Value) in $File: Ignored.");
@@ -1243,6 +1264,14 @@ sub InitGlobalConfig
 		);
 
 	LoadConfigFile($UserConfigDir.'/goldenpod.conf', \%Config, \%OptionRegexHash);
+    # Upgrades the config to include the gpodder.net options, if needed
+    if (!defined $Config{gpodderNetUser})
+    {
+        printd('Upgraded config for gpodder.net options'."\n");
+        $Config{gpodderNetUser} = '';
+        $Config{gpodderNetPassword} = '';
+        WriteGPConfig();
+    }
 	return(1);
 }
 
@@ -1268,6 +1297,8 @@ sub WriteGPConfig
 		DefaultVerbosity => "How verbose GoldenPod should be by default (commandline arguments overrides this)\n# 1 means be verbose (default), 0 means be silent",
 		IgnorePattern => "A regular expression pattern that GoldenPod should ignore when downloading or copying\n# podcasts. It will be applied to the filename. See the manpage for more information about it.\n# --ignore-pattern overrides this setting, and --rmold only obeys --ignore-pattern, not this configuration setting.",
 		PodcastFilter => "If GoldenPod should ignore non-audio files in the feeds\n# 0 means don't ignore (default), 1 means ignore.",
+        gpodderNetUser => "The username for your gpodder.net account,\n# if you want goldenpod to sync with it",
+        gpodderNetPassword => "The password for your gpodder.net account,\n# if you want goldenpod to sync with it",
 		HEADER => "GoldenPod configuration file\n# DO NOT put feed URLs in this file. Those go in podcasts.conf",
 	);
 	# Write the actual file
@@ -1303,7 +1334,11 @@ sub InitConfigDir
 # Usage: Arg_Verbose();
 sub Arg_Verbose
 {
-	$Verbose = 1;
+    my $verbosity = shift // 1;
+    if ($verbosity > $Verbose)
+    {
+        $Verbose = $verbosity;
+    }
 	if(not $NoLog)
 	{
 		$NoLog = 1;
@@ -1463,42 +1498,80 @@ sub addFeed
 		print "If you did not intend to add it, use this command to remove it:\n";
 		print "  goldenpod --remove \"$feed\"\n\n";
 	}
+    my $addedFeed = addFeedToList($feed,$pattern);
+
+    if ($addedFeed)
+    {
+        if ($pattern)
+        {
+            print "Added the fuzzy feed \"$feed\" with the regex pattern /$pattern/\n";
+        }
+        else
+        {
+            goldenpodGpodderNetAction('add',$feed);
+            print "Added the feed $feed\n";
+        }
+    }
+    else
+    {
+        print "Skipped adding the feed $feed: already existed\n";
+    }
+	exit(0);
+}
+
+# Purpose: Add a single feed to the feed list
+sub addFeedToList
+{
+    my $feed = shift;
+    my $pattern = shift;
 	my $feeds = ParseList();
 	my $sources = locateSourceInFeedList($feed,$feeds);
+    my $hadValidEntry = false;
 	if ($sources)
 	{
 		foreach my $i (@{$sources})
 		{
-			$feeds->[$i] = undef;
+            if ($hadValidEntry)
+            {
+                $feeds->[$i] = undef;
+            }
+            else
+            {
+                my $entry = $feeds->[$i];
+                # If an identical entry exists, we use that
+                if(
+                    # Has a pattern and the pattern is identical
+                    (defined($pattern) && defined($entry->{match}) && $pattern eq $entry->{match})
+                    ||
+                    # Doesn't have a pattern, and none was requested
+                    (!defined($pattern) &&
+                            ( !defined($entry->{match} || !length($entry->{match})))
+                    )
+                )
+                {
+                    $hadValidEntry = true;
+                }
+                # Otherwise we remove it
+                else
+                {
+                    $feeds->[$i] = undef;
+                }
+            }
 		}
-	}
-	push(@{$feeds}, {
-			podcast => $feed,
-			match => $pattern,
-			comments => ['# Added: '.scalar(localtime)],
-		});
-	WriteList($feeds);
-
-	if ($pattern)
-	{
-		print "Added the fuzzy feed \"$feed\" with the regex pattern /$pattern/\n";
-	}
-	else
-	{
-		print "Added the feed $feed\n";
-	}
-	if ($sources)
-	{
-		if(scalar @{$sources} > 1)
-		{
-			print 'and removed '.scalar(@{$sources}).' old duplicates.'."\n";
-		}
-		else
-		{
-			print 'and removed one old duplicate.'."\n";
-		}
-	}
-	exit(0);
+        # If we had an identical entry, don't bother processing more
+        if ($hadValidEntry)
+        {
+            return false;
+        }
+    }
+    # Add a fresh entry
+    push(@{$feeds}, {
+            podcast => $feed,
+            match => $pattern,
+            comments => ['# Added: '.scalar(localtime)],
+        });
+    WriteList($feeds);
+    return true;
 }
 
 # Purpose: Handle --removefeed to remove a feed
@@ -1507,6 +1580,24 @@ sub removeFeed
 {
 	shift;
     initialize('util');
+	my $feed = shift;
+	my $removed = removeFeedFromList($feed);
+	if ($removed)
+	{
+        goldenpodGpodderNetAction('remove',$feed);
+		print "Removed the feed \"$feed\".\n";
+	}
+	else
+	{
+		print "The feed \"$feed\" was not found.\n";
+		exit(1);
+	}
+	exit(0);
+}
+
+# Purpose: Remove a single feed from the feed list
+sub removeFeedFromList
+{
 	my $feed = shift;
 	my $feeds = ParseList();
 	my $sources = locateSourceInFeedList($feed,$feeds);
@@ -1520,16 +1611,7 @@ sub removeFeed
 		}
 	}
 	WriteList($feeds);
-	if ($removed)
-	{
-		print "Removed the feed \"$feed\".\n";
-	}
-	else
-	{
-		print "The feed \"$feed\" was not found.\n";
-		exit(1);
-	}
-	exit(0);
+    return $removed;
 }
 
 # Purpose: Check if a feed contains instances of the supplied source,
@@ -1556,6 +1638,323 @@ sub locateSourceInFeedList
 		return;
 	}
 	return \@sources;
+}
+
+# Purpose: Perform an action with gpodder.net if needed/possible
+# This is a thin wrapper around the gpodderNetSync object, which also updates
+# our local state if needed.
+sub goldenpodGpodderNetAction
+{
+    if (!length($Config{gpodderNetUser}) || !length($Config{gpodderNetPassword}))
+    {
+        return;
+    }
+
+    my $gpodder = gpodderNetSync->new(
+        $Config{gpodderNetUser},
+        $Config{gpodderNetPassword},
+        $state->{meta}->{gpodder}->{delta}
+    );
+
+    my $action = shift;
+
+    if ($action eq 'remove' || $action eq 'add')
+    {
+        my $feed = shift;
+        my $change = {
+            $action => [ $feed ]
+        };
+        printd('gpodder.net: '.$action.' '.$feed."\n");
+        my $res = $gpodder->uploadChangedSubscriptions( $change );
+        # FIXME: It returns a list of URLs that it wants us to update. We need
+        # to handle these.
+        $state->{meta}->{gpodder}->{delta} = $res->{timestamp};
+        $state->{metaDirty} = 1;
+    }
+    elsif ($action eq 'push')
+    {
+        my $feeds = ParseList();
+        my @allNormal;
+        foreach my $feed (@{$feeds})
+        {
+            if (!$feed->{match})
+            {
+                push(@allNormal,$feed->{podcast});
+            }
+        }
+        printd('gpodder.net: pushing all subscriptions'."\n");
+        $gpodder->uploadSubscriptions(
+            @allNormal
+        );
+    }
+    elsif ($action eq 'sync')
+    {
+        printd('gpodder.net: downloading subscriptions'."\n");
+        my $changes = $gpodder->getChangedSubscriptions();
+        if(defined $changes->{add})
+        {
+            foreach my $added (@{ $changes->{add} })
+            {
+                # addFeedToList will return 0 if the entry was successfully added,
+                # this is because it returns the number of *duplicates* found
+                if (!addFeedToList($added))
+                {
+                    say "gpodder.net sync - added: $added";
+                }
+            }
+        }
+        if(defined $changes->{remove})
+        {
+            foreach my $removed (@{ $changes->{remove} })
+            {
+                if (removeFeedFromList($removed))
+                {
+                    say "gpodder.net sync - removed: $removed";
+                }
+            }
+        }
+        $state->{meta}->{gpodder}->{delta} = $changes->{timestamp};
+        $state->{metaDirty} = 1;
+    }
+
+    writeDirtyState();
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# A simple perl implementation of parts of the gpodder.net API
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+package gpodderNetSync
+{
+    # This object uses old-school perl OO (manually blessed objects) in order
+    # to avoid non-core deps. It doesn't actually do anything fancy, so for
+    # our use, this is fine.
+
+    # This implements v2 API methods. It returns RAW decoded JSON data from the API
+    # where that is possible, so to find the syntax of the returned data, see the
+    # API documentation on https://gpoddernet.readthedocs.io/en/latest/api/index.html
+
+    use JSON::PP;
+    use Sys::Hostname;
+
+    # Purpose: Create a new gpodderNetSync object
+    # Usage: object = gpodderNetSync->new( USERNAME, PASSWORD, DELTA TIMESTAMP );
+    #
+    # The DELTA TIMESTAMP is the latest timestamp from using the getChangedSubscriptions or
+    # uploadChangedSubscriptions methods.
+    sub new
+    {
+        my $class = shift;
+        my $username = shift;
+        my $password = shift;
+        my $deltaTimestamp = shift;
+        if (!defined $deltaTimestamp)
+        {
+            $deltaTimestamp = 0;
+        }
+
+        eval('use LWP::UserAgent;1;') or die('LWP::UserAgent is missing');
+        my $lwp = LWP::UserAgent->new(
+            agent => $UserAgent.' libwwwperl',
+            requests_redirectable => [ 'GET', 'HEAD' ],
+        );
+        $lwp->credentials("gpodder.net:443",undef,$username,$password);
+        $lwp->cookie_jar( {} );
+
+        return bless {
+            user => $username,
+            password => $password,
+            cookie => undef,
+            LWP => $lwp,
+            authenticated => 0,
+            deviceid => 'goldenpod-'.hostname,
+            deltaTimestamp => $deltaTimestamp,
+        }, $class;
+    }
+
+    # Purpose: Qualify URLs, prefixing the domain and optionally the API version
+    # Usage: url = object->_qualifyURL(URL, bare?)
+    # The bare parameter is a boolean, if true then the /api/2 prefix will be omitted.
+    sub _qualifyURL
+    {
+        shift;
+        my $url = shift;
+        my $bare = shift;
+        if ($bare)
+        {
+            return "https://gpodder.net".$url;
+        }
+        else
+        {
+            return "https://gpodder.net/api/2".$url;
+        }
+    }
+
+    # Purpose: Decode JSON if provided
+    # This is a wrapper around decode_json that, in addition to JSON, also
+    # accepts an empty string (and returns an empty object in that case). This
+    # is because the API often returns an empty string instead of an empty JSON
+    # object when something succeds that doesn't need more feedback than HTTP
+    # already provides.
+    sub _fromJSON
+    {
+        my $self = shift;
+        my $data = shift;
+        if ($data =~ /\S/)
+        {
+            return decode_json($data);
+        }
+        return {};
+    }
+
+    # Purpose: Perform a HTTP PUT request
+    sub _put
+    {
+        my $self = shift;
+        my $url = shift;
+        my $content = shift;
+        my @params = @_;
+
+        my $res = $self->{LWP}->put($url, Content => $content, @params);
+        if ($res->is_success)
+        {
+            return $self->_fromJSON( $res->decoded_content );
+        }
+        else
+        {
+            die("Error performing PUT on ".$url.": ".$res->status_line);
+        }
+    }
+
+    # Purpose: Perform a HTTP GET request
+    sub _get
+    {
+        my $self = shift;
+        my $url = shift;
+
+        my $res = $self->{LWP}->get($url);
+        if ($res->is_success)
+        {
+            return $self->_fromJSON( $res->decoded_content );
+        }
+        else
+        {
+            die("Error performing GET on ".$url.": ".$res->status_line);
+        }
+    }
+
+    # Purpose: Perform a HTTP POST request
+    sub _post
+    {
+        my $self = shift;
+        my $url = shift;
+        my $data = shift;
+
+        my $res = $self->{LWP}->post($url, Content => $data);
+        if ($res->is_success)
+        {
+            return $self->_fromJSON( $res->decoded_content );
+        }
+        else
+        {
+            die("Error performing POST on ".$url.": ".$res->status_line);
+        }
+    }
+
+    # Purpose: Authenticate with gpodder.net
+    sub _authenticate
+    {
+        my $self = shift;
+        $self->_post(
+            $self->_qualifyURL('/auth/'.$self->{user}.'/login.json')
+        );
+        $self->{authenticated} = 1;
+        $self->_post(
+            $self->_qualifyURL('/devices/'.$self->{user}.'/'.$self->{deviceid}.'.json'),
+            encode_json({
+                    caption => 'GoldenPod on '.hostname
+                })
+        );
+        return 1;
+    }
+
+    # Purpose: Perform authentication with gpodder.net if we haven't already done so
+    sub _authenticateIfNeeded
+    {
+        my $self = shift;
+        if (defined $self->{authenticated})
+        {
+            return $self->_authenticate();
+        }
+        return 1;
+    }
+
+    # Purpose: Update our internal deltaTimestamp if the data provided contains an updated one
+    sub _updateTimestamp
+    {
+        my $self = shift;
+        my $json = shift;
+        if (defined $json && ref $json && defined $json->{timestamp})
+        {
+            $self->{deltaTimestamp} = $json->{timestamp};
+        }
+    }
+
+    # Purpose: Retrieve a list of all subscriptions from the API
+    sub getSubscriptions
+    {
+        my $self = shift;
+        $self->_authenticateIfNeeded();
+        return $self->_get(
+            $self->_qualifyURL('/subscriptions/'.$self->{user}.'/'.$self->{deviceid}.'.json', 1)
+        );
+    }
+
+    # Purpose: Upload a complete, new list of subcriptions for this device
+    sub uploadSubscriptions
+    {
+        my $self = shift;
+        $self->_authenticateIfNeeded();
+        my @list = @_;
+
+        my $subs = join("\n",@list);
+
+        return $self->_put(
+            $self->_qualifyURL('/subscriptions/'.$self->{user}.'/'.$self->{deviceid}.'.txt',1),
+            $subs
+        );
+    }
+
+    # Purpose: Upload subscription changes for this device
+    # Usage: object->uploadChangedSubscriptions( $changes );
+    # $changes is a hash reference, see https://gpoddernet.readthedocs.io/en/latest/api/reference/subscriptions.html#upload-subscription-changes for its syntax
+    sub uploadChangedSubscriptions
+    {
+        my $self = shift;
+        $self->_authenticateIfNeeded();
+        my $changes = shift;
+
+        my $result = $self->_post(
+            $self->_qualifyURL('/subscriptions/'.$self->{user}.'/'.$self->{deviceid}.'.json'),
+            encode_json($changes)
+        );
+
+        $self->_updateTimestamp( $result );
+        return $result;
+    }
+
+    # Purpose: Retrieve subscription changes since the current timestamp
+    # See https://gpoddernet.readthedocs.io/en/latest/api/reference/subscriptions.html#get-subscription-changes for the format of the returned data
+    sub getChangedSubscriptions
+    {
+        my $self = shift;
+        $self->_authenticateIfNeeded();
+
+        my $result = $self->_get(
+            $self->_qualifyURL('/subscriptions/'.$self->{user}.'/'.$self->{deviceid}.'.json?since='.$self->{deltaTimestamp})
+        );
+        $self->_updateTimestamp( $result );
+        return $result;
+    }
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2485,6 +2884,23 @@ GetOptions (
 	'files|n=s' => \$FileNumber,
 	'delete|d' => \$CopyFiles_Delete,
 	'rmold|o' => \$RemoveOldFiles,
+    'gpodder-push' => sub
+    {
+        initialize('util'),
+        goldenpodGpodderNetAction('push');
+        exit(0);
+    },
+    'gpodder-sync' => sub
+    {
+        initialize('full'),
+        goldenpodGpodderNetAction('sync');
+    },
+    'gpodder-sync-only' => sub
+    {
+        initialize('util'),
+        goldenpodGpodderNetAction('sync');
+        exit(0);
+    },
 	'fuzzydump=s' => sub {
 		shift; my $url = shift;
 		my $Output = fetchURL($url);
@@ -2554,6 +2970,10 @@ GetOptions (
 		exit 0
 	},
 	'quick=s' => \&quickDownload,
+    # Increase verbosity to enable debugging messages
+    'debug' => sub {
+        Arg_Verbose(99);
+    },
 	# Display information about which config files and settings we would use
 	'dumpinfo|debuginfo' => sub { DumpInfo(1); exit 0 },
 	'prefer-curl|prefercurl' => sub { $downloader = 'curl' },
@@ -2629,6 +3049,8 @@ any parameters.
 
 =head1 OPTIONS
 
+=head2 Basic
+
 =over
 
 =item B<-h, --help>
@@ -2647,6 +3069,18 @@ Be silent.
 
 Don't create a message logfile when in non-verbose mode. No effect unless in
 B<--silent> mode.
+
+=item B<--debuginfo>
+
+Print the configuration and podcast list filenames that GoldenPod would read,
+in addition to the logfiles it would use and write to. Additionally it includes
+some information about versions of libraries and utilities that gpgpwd uses.
+
+=back
+
+=head2 Subscription management
+
+=over
 
 =item B<-a, --add, --addfeed I<FEED> (I<REGEX>) >
 
@@ -2670,25 +3104,35 @@ This downloads URL and parses it once with each parser, then tells you
 which parser it recommends that you to use. It will also attempt feed
 autodiscovery if the URL is not an RSS feed.
 
+=item B<--fuzzydump I<URL>>
+
+This uses the GoldenPod fuzzy parser to list audio files found in I<URL>.
+The fuzzy parser is the one invoked when using the "/REGEX/ URL" syntax
+in the podcasts.conf file (ie. to fetch podcasts from a non-RSS source).
+
+You can use this to see if GoldenPod finds anything in the URL, and
+to find out what your /REGEX/ for the URL should be.
+
+=item B<--rssdump I<URL>>
+
+This uses the GoldenPod standard/RSS parser to list files found in I<URL>.
+
+You can use this to see if GoldenPod finds anything in the URL. It is mostly
+useful to find out if GoldenPod has problems parsing a feed, or if a certain
+feed needs the fuzzy parser to work properly.
+
+=back
+
+=head2 Download options
+
+=over
+
 =item B<--prefer-curl>
 
 Prefer to use curl over LWP if present. GoldenPod uses LWP by default if it is
 available, and falls back to curl if LWP is missing. This parameter reverses
 this behaviour, using curl if it is available and falling back to LWP if curl
 is missing.
-
-=item B<--debuginfo>
-
-Print the configuration and podcast list filenames that GoldenPod would read,
-in addition to the logfiles it would use and write to. Additionally it includes
-some information about versions of libraries and utilities that gpgpwd uses.
-
-=item B<--stats>
-
-Print some simple statistics: How many files you currently have in your
-catalogue, which file is the latest, which file is the oldest and how much
-space they are using.
-
 =item B<-u, --dry-run>
 
 Used along with --copy or --rmold. Just display what would be done, don't
@@ -2713,48 +3157,6 @@ for one-off downloads, or to just check out the latest episode of a podcast
 before adding a full subscription. This will try both parsers, the one that
 finds the most will be used.
 
-=item B<-c, --copy I</path>>
-
-Copy the last N downloaded files to /path/ and delete the other files in
-/path/.  This is very useful for synchronizing the latest podcasts with your
-MP3 player.  N is either 4 by default or optionally the value supplied to
---files.
-
-=item B<-d, --delete>
-
-For use with --copy, delete all files in /path/ unless they are one of the
-files we are about to copy. It will not allow you to delete files directly in
-your home directory (but all subdirectories except Documents) nor any files in
-/usr /var /dev /etc /lib /sbin /sys /boot or /proc.
-
-=item B<-n, --files I<N>>
-
-For use with --copy or --rmold. Copy/delete N files instead of 4.
-
-=item B<--fuzzydump I<URL>>
-
-This uses the GoldenPod fuzzy parser to list audio files found in I<URL>.
-The fuzzy parser is the one invoked when using the "/REGEX/ URL" syntax
-in the podcasts.conf file (ie. to fetch podcasts from a non-RSS source).
-
-You can use this to see if GoldenPod finds anything in the URL, and
-to find out what your /REGEX/ for the URL should be.
-
-=item B<--rssdump I<URL>>
-
-This uses the GoldenPod standard/RSS parser to list files found in I<URL>.
-
-You can use this to see if GoldenPod finds anything in the URL. It is mostly
-useful to find out if GoldenPod has problems parsing a feed, or if a certain
-feed needs the fuzzy parser to work properly.
-
-=item B<-o, --rmold>
-
-Delete N old podcasts, where N is either 4 or optionally the value supplied to
---files. Use this to free up some disk space taken up by old podcasts.  This
-will obey --ignore-pattern but not the I<IgnorePattern> configuration option.
-It will always leave at least the latest podcast.
-
 =item B<-i, --ignore-pattern>
 
 Ignore files matching the regular expression pattern supplied when downloading
@@ -2768,11 +3170,70 @@ expression is case sensitive.  If you would like to match both Foo and foo you
 could do: "--ignore-pattern [f|F]oo".  --ignore-pattern supports standard perl
 regular expressions (will be executed within m//).
 
+=back
+
+=head2 Collection management
+
+=over
+
+=item B<-c, --copy I</path>>
+
+Copy the last N downloaded files to /path/ and delete the other files in
+/path/.  This is very useful for synchronizing the latest podcasts with your
+MP3 player.  N is either 4 by default or optionally the value supplied to
+--files. This option also obeys I<--ignore-pattern>.
+
+=item B<-d, --delete>
+
+For use with --copy, delete all files in /path/ unless they are one of the
+files we are about to copy. It will not allow you to delete files directly in
+your home directory (but all subdirectories except Documents) nor any files in
+/usr /var /dev /etc /lib /sbin /sys /boot or /proc.
+
+=item B<-n, --files I<N>>
+
+For use with --copy or --rmold. Copy/delete N files instead of 4.
+
+=item B<-o, --rmold>
+
+Delete N old podcasts, where N is either 4 or optionally the value supplied to
+--files. Use this to free up some disk space taken up by old podcasts.  This
+will obey --ignore-pattern but not the I<IgnorePattern> configuration option.
+It will always leave at least the latest podcast.
+
 =item B<--clean>
 
 Clean up the podcasts directory and catalogue. This is useful if you removed
 files by hand. It will remove empty directories, remove orphaned symlinks in
 the catalogue and rewrite playlists. This is also done after --rmold.
+
+=item B<--stats>
+
+Print some simple statistics: How many files you currently have in your
+catalogue, which file is the latest, which file is the oldest and how much
+space they are using.
+
+=back
+
+=head2 gpodder.net synchronization
+
+See also the GPODDER.NET section below
+
+=over
+
+=item B<--gpodder-push>
+
+Push all subscriptions to gpodder.net, overwriting any previously uploaded
+subscriptions that have been uploaded by goldenpod from the current host.
+
+=item B<--gpodder-sync>
+
+Perform a sync with gpodder.net and then proceed to download new podcasts as
+normal.
+
+=item B<--gpodder-sync-only>
+
+Perform a sync with gpodder.net and then exit.
 
 =back
 
@@ -2803,6 +3264,23 @@ regular expression a single "." (without the quotes) to make it match them all).
 To use the fuzzy parser, supply a regular expression as the second parameter
 to I<--add> (or, if you edit the podcasts.conf file by hand, use the "/regex/
 URL" syntax).
+
+=head1 GPODDER.NET
+
+I<gpodder.net> is a podcast subscription synchronization service. GoldenPod can sync
+your subscriptions with this service, so that for instance your podcast client on
+your phone stays up to date with the subscriptions you have in GoldenPod.
+
+To enable sync with gpodder.net you must edit I<goldenpod.conf> to add your
+gpodder.net username and password, and then run I<goldenpod --gpodder-push> once
+to upload your current subscriptions. Then whenever you do I<goldenpod --add> or
+I<goldenpod --remove>, GoldenPod will push those changes to gpodder.net as well.
+
+To pull down changes that have been made on gpodder.net or in other podcast
+clients that you have chosen to synchronize with GoldenPod, run either
+I<goldenpod --gpodder-sync> which will first sync with gpodder.net and then
+proceed to download new podcasts as normal, or I<goldenpod --gpodder-sync-only>
+which will sync with gpodder.net and then exit.
 
 =head1 EXAMPLE podcasts.conf
 
@@ -2864,7 +3342,8 @@ The file containing a list of podcast feeds.
 
 The configuration file for GoldenPod, which contains the location to save
 streams to, your desired verbosity level, the default IgnorePattern and if you
-want to use the PodcastFilter.
+want to use the PodcastFilter, as well as you gpodder.net username and password
+if you wish to use gpodder.net integraton.
 
 =item I<~/.goldenpod/downloaded.json>
 
@@ -2889,7 +3368,7 @@ goldenpod is run.
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010
+Copyright (C) Eskild Hustvedt 2005, 2006, 2007, 2009, 2010, 2017, 2018
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

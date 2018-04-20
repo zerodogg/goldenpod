@@ -9,6 +9,7 @@ GoldenPod changelog
 - Removed --dumpinfo (is now an alias to --debuginfo)
 - Replaced the flat-file download log with a JSON log that contains additional metadata
 - Added a separate meta storage file to aid in keeping a sane catalogue
+- Added support for syncing with gpodder.net
 
 0.8.4
 - - - -
