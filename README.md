@@ -1,4 +1,4 @@
-# GoldenPod - a podcast client in perl
+# GoldenPod - a podcast client
 
 GoldenPod is a command line podcast client written in perl. It allows you to
 easily manage and download podcasts from the command line. It can download
@@ -7,8 +7,8 @@ cleartext document (ie. XML or HTML) for a list of audio files and download
 those.
 
 Information on how to configure goldenpod can be found in the manpage. If
-GoldenPod is installed globally on your system just type "man goldenpod", if
-not then type either "man ./goldenpod.1" or "perldoc ./goldenpod".
+GoldenPod is installed globally on your system just type `man goldenpod`, if
+not then type either `man ./goldenpod.1` or `perldoc ./goldenpod`.
 
 ## Bug reports
 
