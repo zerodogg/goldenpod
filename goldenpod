@@ -72,8 +72,6 @@ my $CopyFilesTo;
 my $RemoveOldFiles = 0;
 # The number of --files to --copy or --rmold
 my $FileNumber = undef;
-# The path to the podcast logfile
-my $PodcastLog;
 # Internal application state
 my $state = {
     # The list of downloaded podcasts
@@ -191,7 +189,6 @@ sub PrintHelp
 sub Help
 {
     initialize('util');
-	$PodcastLog =~ s/$ENV{HOME}/~/;
 	my $all = shift;
 	Version();
 	printf("\nUsage: %s", basename($0));
@@ -758,7 +755,6 @@ sub DumpInfo
 	{
 		printf($pattern, 'Logfile',GetLogFile());
 	}
-	printf($pattern, 'List of downloaded podcasts',$PodcastLog);
 	printf($pattern, 'Target download directory',$Config{WorkingDir});
     printf($pattern, 'Perl version', sprintf('%vd',$^V));
     # Don't output useless "used only once, possible typo" warnings
@@ -1572,6 +1568,7 @@ sub loadState
 {
     state $loadedState = 0;
     return if $loadedState;
+    my $PodcastLog = $UserConfigDir.'/podcasts.log';
     if (-e $UserConfigDir.'/downloaded.json')
     {
         $state->{downloaded} = decode_json( slurpFile($UserConfigDir.'/downloaded.json') );
@@ -2355,7 +2352,6 @@ sub initialize
 	}
 
 	# Do base initialization
-    $PodcastLog = $UserConfigDir.'/podcasts.log';
     $PodcastList = $UserConfigDir.'/podcasts.conf';
 
 	# Be verbose by default if the user wants to
@@ -2870,9 +2866,13 @@ The configuration file for GoldenPod, which contains the location to save
 streams to, your desired verbosity level, the default IgnorePattern and if you
 want to use the PodcastFilter.
 
-=item I<~/.goldenpod/podcasts.log>
+=item I<~/.goldenpod/downloaded.json>
 
 The logfile containing the URLs for the podcasts already downloaded.
+
+=item I<~/.goldenpod/meta.json>
+
+Metadata storage.
 
 =item I<~/.goldenpod/goldenpod.log>
 
