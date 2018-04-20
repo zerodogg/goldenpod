@@ -580,6 +580,17 @@ sub printv
 	}
 }
 
+# Purpose: print() something if debug output is enabled
+# Usage: printd(OPTS);
+#  OPTS are identical to print();
+sub printd
+{
+    if ($Verbose >= 99)
+    {
+        print('Debug: ',@_);
+    }
+}
+
 # Purpose: Get the path to the logfile
 # Usage: logfile = GetLogFile();
 sub GetLogFile
@@ -1326,7 +1337,11 @@ sub InitConfigDir
 # Usage: Arg_Verbose();
 sub Arg_Verbose
 {
-	$Verbose = 1;
+    my $verbosity = shift // 1;
+    if ($verbosity > $Verbose)
+    {
+        $Verbose = $verbosity;
+    }
 	if(not $NoLog)
 	{
 		$NoLog = 1;
@@ -2954,6 +2969,10 @@ GetOptions (
 		exit 0
 	},
 	'quick=s' => \&quickDownload,
+    # Increase verbosity to enable debugging messages
+    'debug' => sub {
+        Arg_Verbose(99);
+    },
 	# Display information about which config files and settings we would use
 	'dumpinfo|debuginfo' => sub { DumpInfo(1); exit 0 },
 	'prefer-curl|prefercurl' => sub { $downloader = 'curl' },
