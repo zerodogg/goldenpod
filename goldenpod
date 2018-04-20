@@ -1486,28 +1486,24 @@ sub addFeed
 		print "If you did not intend to add it, use this command to remove it:\n";
 		print "  goldenpod --remove \"$feed\"\n\n";
 	}
-    my $sources = addFeedToList($feed,$pattern);
+    my $addedFeed = addFeedToList($feed,$pattern);
 
-	if ($pattern)
-	{
-		print "Added the fuzzy feed \"$feed\" with the regex pattern /$pattern/\n";
-	}
-	else
-	{
-        goldenpodGpodderNetAction('add',$feed);
-		print "Added the feed $feed\n";
-	}
-	if ($sources)
-	{
-		if(scalar @{$sources} > 1)
-		{
-			print 'and removed '.scalar(@{$sources}).' old duplicates.'."\n";
-		}
-		else
-		{
-			print 'and removed one old duplicate.'."\n";
-		}
-	}
+    if ($addedFeed)
+    {
+        if ($pattern)
+        {
+            print "Added the fuzzy feed \"$feed\" with the regex pattern /$pattern/\n";
+        }
+        else
+        {
+            goldenpodGpodderNetAction('add',$feed);
+            print "Added the feed $feed\n";
+        }
+    }
+    else
+    {
+        print "Skipped adding the feed $feed: already existed\n";
+    }
 	exit(0);
 }
 
@@ -1518,22 +1514,52 @@ sub addFeedToList
     my $pattern = shift;
 	my $feeds = ParseList();
 	my $sources = locateSourceInFeedList($feed,$feeds);
+    my $hadValidEntry = false;
 	if ($sources)
 	{
 		foreach my $i (@{$sources})
 		{
-			$feeds->[$i] = undef;
+            if ($hadValidEntry)
+            {
+                $feeds->[$i] = undef;
+            }
+            else
+            {
+                my $entry = $feeds->[$i];
+                # If an identical entry exists, we use that
+                if(
+                    # Has a pattern and the pattern is identical
+                    (defined($pattern) && defined($entry->{match}) && $pattern eq $entry->{match})
+                    ||
+                    # Doesn't have a pattern, and none was requested
+                    (!defined($pattern) &&
+                            ( !defined($entry->{match} || !length($entry->{match})))
+                    )
+                )
+                {
+                    $hadValidEntry = true;
+                }
+                # Otherwise we remove it
+                else
+                {
+                    $feeds->[$i] = undef;
+                }
+            }
 		}
-	}
-    # FIXME: Don't overwrite existing entries, keep the first one, remove the
-    # rest if needed. This avoids bad "Added:" labels.
-	push(@{$feeds}, {
-			podcast => $feed,
-			match => $pattern,
-			comments => ['# Added: '.scalar(localtime)],
-		});
-	WriteList($feeds);
-    return $sources;
+        # If we had an identical entry, don't bother processing more
+        if ($hadValidEntry)
+        {
+            return false;
+        }
+    }
+    # Add a fresh entry
+    push(@{$feeds}, {
+            podcast => $feed,
+            match => $pattern,
+            comments => ['# Added: '.scalar(localtime)],
+        });
+    WriteList($feeds);
+    return true;
 }
 
 # Purpose: Handle --removefeed to remove a feed
