@@ -19,7 +19,7 @@ endif
 BINDIR ?= $(prefix)/bin
 DATADIR ?= $(prefix)/share
 
-DISTFILES = AUTHORS COPYING goldenpod INSTALL Makefile NEWS README TODO goldenpod.1
+DISTFILES = AUTHORS COPYING goldenpod Makefile NEWS README.md TODO goldenpod.1
 
 # Install goldenpod
 install:
