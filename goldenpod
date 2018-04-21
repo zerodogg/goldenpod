@@ -380,7 +380,7 @@ sub fetchURL
 			iprint('100% done');
 			printv ("\n");
 		}
-		if(not $response->is_success)
+		if(!$response->is_success && !($targetFile && $response->code == 304))
 		{
             if ($response->code == 304 && $targetFile)
             {
@@ -389,8 +389,15 @@ sub fetchURL
 			warn("Download of $URL failed: ".$response->status_line."\n");
 			return;
 		}
-		# Return the content
-		return $response->content;
+        if ($targetFile)
+        {
+            return 1;
+        }
+        else
+        {
+            # Return the content
+            return $response->content;
+        }
 	}
 	elsif ($downloader eq 'curl')
 	{
