@@ -357,6 +357,7 @@ sub fetchURL
 			agent => $UserAgent.' libwwwperl',
 			requests_redirectable => [ 'GET', 'HEAD' ],
 		);
+        $UA->default_header('Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8');
 		# Honor proxy settings in env
 		$UA->env_proxy();
 		my $response;
