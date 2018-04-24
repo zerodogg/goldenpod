@@ -10,6 +10,7 @@ GoldenPod changelog
 - Replaced the flat-file download log with a JSON log that contains additional metadata
 - Added a separate meta storage file to aid in keeping a sane catalogue
 - Added support for syncing with gpodder.net
+- Added --file-source (provides info on which feed a file was downloaded from)
 
 0.8.4
 - - - -

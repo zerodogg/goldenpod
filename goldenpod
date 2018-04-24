@@ -233,6 +233,7 @@ sub Help
 		PrintHelp('', '--prefer-curl', 'Prefer to use curl for downloading if available, instead of LWP (curl is used by default if LWP is missing)');
 		PrintHelp('', '--fuzzydump URL', 'Dump the list of files found by the fuzzy parser in URL. See the manpage for more information');
 		PrintHelp('', '--rssdump URL', 'Dump the list of files found by the standard parser in URL. See the manpage for more information');
+        PrintHelp('','--file-source PATH','If the file located at PATH was downloaded by goldenpod, output which feed it came from');
 	}
 }
 
@@ -816,6 +817,30 @@ sub DumpInfo
     my $digest = $md5->hexdigest;
     close($f);
     printf($pattern,'MD5',$digest);
+}
+
+# Purpose: Output where a file came from, if possible
+# Usage: ouptutSourceOfFile( FILE );
+sub outputSourceOfFile
+{
+    initialize('util');
+
+    my $file = realpath(shift);
+
+    my @components = split('/',$file);
+    # We're interested in the last two components of the file
+    my $path = join('/',$components[-2],$components[-1]);
+
+    my $stateEntry = $state->{meta}->{files}->{$path};
+
+    if ($stateEntry && ref($stateEntry) && $stateEntry->{from})
+    {
+        say $path.': is from '.$stateEntry->{from};
+    }
+    else
+    {
+        say $path.': is from an unknown source (downloaded by an old version of goldenpod or not downloaded by goldenpod)';
+    }
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2616,8 +2641,6 @@ sub FetchFeeds
 	# The list of podcasts to download in first-only mode
 	my @FirstOnly;
 
-	loadState();
-
 	# Open the configuration file for reading
 	my $config = ParseList();
 
@@ -2977,6 +3000,11 @@ GetOptions (
 		print 'The files are using ', sprintf ('%.0f', $USED_DISKSPACE), " MB of diskspace\n";
 		exit 0
 	},
+    'file-source' => sub
+    {
+        outputSourceOfFile(shift(@ARGV));
+        exit(0);
+    },
 	'quick=s' => \&quickDownload,
     # Increase verbosity to enable debugging messages
     'debug' => sub {
@@ -3180,7 +3208,7 @@ regular expressions (will be executed within m//).
 
 =back
 
-=head2 Collection management
+=head2 Collection management and information
 
 =over
 
@@ -3220,6 +3248,14 @@ the catalogue and rewrite playlists. This is also done after --rmold.
 Print some simple statistics: How many files you currently have in your
 catalogue, which file is the latest, which file is the oldest and how much
 space they are using.
+
+=item B<--file-source I</path>>
+
+If the file located at I</path> was downloaded by GoldenPod (version 0.9 or
+later), output which feed that file was downloaded from. If the file has not
+been downloaded by GoldenPod, has been renamed or moved afterwards, or was
+downloaded by a version of GoldenPod previous to version 0.9, a message
+indicating that it is from an unknown source will be output instead.
 
 =back
 
