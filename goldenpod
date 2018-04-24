@@ -2672,7 +2672,7 @@ sub FetchFeeds
 		my $newP = 0;
 		foreach my $url (@{$URLs})
 		{
-            if (!hasAlreadyBeenDownloaded('',$url))
+            if (!hasAlreadyBeenDownloaded($podcast,$url))
 			{
 				push(@PodcastsAvailable, { feed => $podcast, url => $url });
 				if (not $match or $url =~ /$match/)
