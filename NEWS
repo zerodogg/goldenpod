@@ -11,6 +11,8 @@ GoldenPod changelog
 - Added a separate meta storage file to aid in keeping a sane catalogue
 - Added support for syncing with gpodder.net
 - Added --file-source (provides info on which feed a file was downloaded from)
+- Added --mark-as-downloaded to allow marking entries in a single feed as downloaded
+- Deprecated --no-download in favour of --mark-as-downloaded
 
 0.8.4
 - - - -

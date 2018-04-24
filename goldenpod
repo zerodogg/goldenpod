@@ -217,7 +217,7 @@ sub Help
 	PrintHelp('', '--ping URL', 'Test URL using both parsers and display which parser is recommended for it.');
 	PrintHelp('', '--stats', 'Print some simple statistics');
 	PrintHelp('-u', '--dry-run', 'Display what would be done but don\'t do it. Implies --verbose');
-	PrintHelp('-w', '--no-download','Mark all podcasts as downloaded. Implies --verbose.');
+    PrintHelp('','--mark-as-downloaded [URL]','Marks all entries in [URL] as having already been downloaded. Implies --verbose');
 	PrintHelp('-f', '--first-only', 'Only download the first file in any feed. Permanently ignore the others.');
 	PrintHelp('-c', '--copy [path]', 'Copy the last N downloaded files to path. N is either 4 or the number supplied to --files.');
 	PrintHelp('-n', '--files N', 'Copy N files instead of 4 (use with --copy or --rmold)');
@@ -2629,7 +2629,18 @@ sub quickDownload
 }
 
 # Purpose: Fetch and parse the feeds
-# Usage: FetchFeeds();
+# Usage: FetchFeeds(FEEDS);
+#
+# FEEDS is an array of hashes, conforming to the format returned by ParseList():
+# [
+#   {
+#       podcast => URL,
+#       match => optional-regex,
+#       lineNo => optional-line-number,
+#   }
+# ]
+#
+# If FEEDS is omitted, then it will simply call ParseList to get one.
 sub FetchFeeds
 {
 	# The list of podcasts to download
@@ -2641,11 +2652,21 @@ sub FetchFeeds
 	# The list of podcasts to download in first-only mode
 	my @FirstOnly;
 
-	# Open the configuration file for reading
-	my $config = ParseList();
+    my @FeedList = @_;
+
+    if (!@FeedList)
+    {
+        @FeedList = @{ ParseList() };
+
+        # If the config is empty, die.
+        if (!@FeedList)
+        {
+            die "The podcast list in $PodcastList is empty, nothing to do.\n";
+        }
+    }
 
 	# Read the configuration file and fetch feeds
-	foreach my $entry (@{$config})
+	foreach my $entry (@FeedList)
 	{
 		my $podcast = $entry->{podcast};
 		my $match = $entry->{match};
@@ -2700,12 +2721,6 @@ sub FetchFeeds
 		}
 	}
 
-	# If the config is empty, die.
-	if (not scalar(@{$config}))
-	{
-		die "The podcast list in $PodcastList is empty, nothing to do.\n";
-	}
-
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	# Find out if we need to download anything
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -2732,10 +2747,6 @@ sub FetchFeeds
         {
             appendToDownloadedList($entry->{feed},$entry->{url},undef,0);
         }
-        if ($NoDownloadMode)
-        {
-			exit(0);
-		}
 	}
 	return(\@DownloadQueue);
 }
@@ -2873,6 +2884,11 @@ sub main
 
 	# Fetch and parse our feeds.
 	my $DownloadQueue = FetchFeeds();
+    # If we're in NoDownloadMode, then we should exit here
+    if ($NoDownloadMode)
+    {
+        exit(0);
+    }
 	if(scalar(@{$DownloadQueue}) == 0)
 	{
 		if(not $Verbose)
@@ -2899,8 +2915,30 @@ GetOptions (
 	'version' => sub { Version(); exit 0},
 	'help|h' => sub { Help(); exit 0; },
 	'help-all' => sub { Help(1); exit 0; },
-	'no-download|nodownload|w' => sub { Arg_Verbose(); $NoDownloadMode = 1 },
+	'no-download|nodownload|w' => sub {
+        say "WARNING: --no-download (-w) is deprecated and will be removed in a future version.";
+        say "         Look into --mark-as-downloaded instead.";
+        Arg_Verbose();
+        $NoDownloadMode = 1
+    },
 	'dry-run|dryrun|u' => sub { Arg_Verbose(); $DryRun_Mode = 1},
+    'mark-as-downloaded=s' => sub {
+        shift;
+        initialize('util');
+        my $feed = shift;
+        Arg_Verbose();
+        $NoDownloadMode = 1;
+        # FIXME: Verify that we actually have a subscription to $feed, and use
+        # its complete entry from podcasts.conf
+        my @marked = @{ FetchFeeds({
+                podcast => $feed
+            }) };
+        if (@marked)
+        {
+            say "Marked all items in $feed as downloaded.";
+        }
+        exit(0);
+    },
 	'first-only|firstonly|first|f' => \$FirstOnly,
 	'nolog|l' => sub { $NoLog = 2},
 	'copy|c=s'=> \$CopyFilesTo,
@@ -3174,17 +3212,17 @@ is missing.
 Used along with --copy or --rmold. Just display what would be done, don't
 actually copy or delete anything.  Implies B<--verbose>
 
-=item B<-w, --no-download>
-
-Mark all podcasts as downloaded.  Useful when you want to subscribe to a
-podcast but not download all of the old issues. You can edit the logfile
-afterwards and remove those you want to download.  Implies B<--verbose>.
-
 =item B<-f, --first-only>
 
 Download the first file in any feed, and then permanently ignore the others.
 If you at any later point want to download older files, you will need to edit
-the logfile. Unlike --no-download this does not imply --verbose.
+the logfile.
+
+=item B<--mark-as-downloaded I<URL>>
+
+Marks all entries in I<URL> as having already been downloaded. Useful if you
+are adding a subscription to a long-running podcast and don't want to download
+the entire archive of episodes.
 
 =item B<--quick I<URL>>
 
