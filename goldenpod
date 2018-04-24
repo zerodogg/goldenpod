@@ -3038,9 +3038,10 @@ GetOptions (
 		print 'The files are using ', sprintf ('%.0f', $USED_DISKSPACE), " MB of diskspace\n";
 		exit 0
 	},
-    'file-source' => sub
+    'file-source=s' => sub
     {
-        outputSourceOfFile(shift(@ARGV));
+        shift;
+        outputSourceOfFile(shift);
         exit(0);
     },
 	'quick=s' => \&quickDownload,
