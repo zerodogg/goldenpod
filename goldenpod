@@ -1483,7 +1483,7 @@ sub listFeeds
 	foreach my $feed (@{$feeds})
 	{
         my $metaEntry = $metaState->{titles}->{$feed->{podcast}};
-        if ($metaEntry)
+        if ($metaEntry && $metaEntry->{currentFull})
         {
             $feed->{name} = $metaEntry->{currentFull};
         }
