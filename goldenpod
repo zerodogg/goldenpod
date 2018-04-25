@@ -2093,22 +2093,37 @@ sub addMetadataTitle
 {
     my $feed = shift;
     my $title = shift;
-    if (!defined $title || !defined $feed)
+    if (!defined $title)
     {
         return;
     }
+
+    my $normalizedTitle = $title;
+    $normalizedTitle =~ s/\s+/_/g;
+
+    if (!defined $feed)
+    {
+        return $normalizedTitle;
+    }
+
     my $metaState = getMetaState();
     $metaState->{titles}->{$feed} //= {
         current => undef,
     };
     $metaState->{titles}->{$feed}->{historical} //= [];
     my $oldCurrent = $metaState->{titles}->{$feed}->{current};
-    $metaState->{titles}->{$feed}->{current} = $title;
-    if(defined $oldCurrent && $oldCurrent ne $title)
+    $metaState->{titles}->{$feed}->{current} = $normalizedTitle;
+    $metaState->{titles}->{$feed}->{currentFull} = $title;
+    if(defined $oldCurrent && $oldCurrent ne $normalizedTitle)
     {
         push(@{ $metaState->{titles}->{$feed}->{historical} },$oldCurrent);
     }
-    $state->{metaDirty} = 1;
+    # If we changed the state, mark it as dirty
+    if (!defined $oldCurrent || $oldCurrent ne $normalizedTitle)
+    {
+        $state->{metaDirty} = 1;
+    }
+    return $normalizedTitle;
 }
 
 # Purpose: Append an entry to the list of downloaded podcasts
@@ -2211,10 +2226,10 @@ sub ParseTitle
 		# Remove stuff in parens, as that often contains stuff like "mp3 feed"
 		$FeedTitle =~ s/\([^\)]*\)//;
 		$FeedTitle =~ s/<[^>]+>//g;
-		$FeedTitle =~ s/\s+/_/g;
+		$FeedTitle =~ s/\s+/ /g;
 		$FeedTitle =~ s#(/|\#|\(|\)|\&|\%|\¤|\"|\|)#_#g;
 		$FeedTitle =~ s/[\-\_]+(episodes?|promo|mp3|ogg|feed)*$//gi; # Remove various junk
-		$FeedTitle =~ s/[\-\_]?$//; # Remove -_ in the end of the name
+		$FeedTitle =~ s/[\s\-\_]?$//; # Remove -_ in the end of the name
 		# Remove more than one - or _ in a row
 		$FeedTitle =~ s/-+/-/g;
 		$FeedTitle =~ s/_+/_/g;
@@ -2374,6 +2389,10 @@ sub ParseFeed
 
 	# Try to find the title of the podcast
 	my $FeedTitle = ParseTitle($FeedContents);
+    # Store the title string in our metadata.
+    # addMetadataTitle will return a normalized version with no whitespace
+    # for us. The title from ParseTitle() can contain whitespace.
+    $FeedTitle = addMetadataTitle($feedURL,$FeedTitle);
 
 	# Do the real parsing and add to @urls
 	# We want to extract all url='s
@@ -2394,8 +2413,6 @@ sub ParseFeed
 		{
 			next if basename($CurrUrl) =~ /$IgnorePattern/;
 		}
-        # Store the title string in our metadata
-        addMetadataTitle($feedURL,$FeedTitle);
 		if(not $URLList{$CurrUrl})
 		{
 			push(@URLs, $CurrUrl);
