@@ -336,6 +336,7 @@ sub fetchURL
 
 	if ($downloader eq 'LWP')
 	{
+        sayd('Going to download '.$URL.' with LWP');
 		# Reset our state
 		$lastP = 0;
 		$prevLen = 0;
@@ -354,12 +355,14 @@ sub fetchURL
 		# it to a file instead and handles all the nasties for us.
 		if ($targetFile)
 		{
+            sayd('Using ->mirror to download');
 			printv('Downloading '.$URL.' ... ');
 			$response = $UA->mirror($URL,$targetFile);
 		}
 		# If we don't, just use standard get
 		else
 		{
+            sayd('Using ->get to download');
 			printv('Fetching '.$URL.' ... ');
 			$response = $UA->get($URL);
 		}
@@ -389,6 +392,8 @@ sub fetchURL
 	}
 	elsif ($downloader eq 'curl')
 	{
+        sayd('Going to download '.$URL.' with curl');
+
 		my ($Child_IN, $Child_OUT, $Output);
 		# Curl options:
 		# -C to continue when possible
@@ -406,16 +411,15 @@ sub fetchURL
 		{
 			push(@CurlArgs, qw(--silent --show-error));
 		}
+        my $message = 'Fetching';
 		# Output to a file
-		if ($targetFile)
-		{
+        if ($targetFile)
+        {
+            $message = 'Downloading';
 			push(@CurlArgs,'-O');
-			printv('Downloading '.$URL."\n");
-		}
-		else
-		{
-			printv('Fetching '.$URL."\n");
-		}
+        }
+        sayd('Calling curl with: '.join(' ',@CurlArgs));
+        printv($message.' '.$URL."\n");
 
 		my $PID = open2($Child_OUT, $Child_IN, 'curl',@CurlArgs,$URL) or die("Unable to open3() connection to curl: $!\n");
 
