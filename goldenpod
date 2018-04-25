@@ -74,25 +74,10 @@ my $CopyFilesTo;
 my $RemoveOldFiles = 0;
 # The number of --files to --copy or --rmold
 my $FileNumber = undef;
-# Internal application state
-my $state = {
-    # The list of downloaded podcasts
-    downloaded => {
-        _VERSION => 1
-    },
-    # Additional metadata, including gpodder.net state
-    meta => {
-        _VERSION => 1,
-        files => {},
-        # gpodder.net metadata
-        gpodder => {
-            delta => 0
-        }
-    },
-    # If the downloaded list has been modified, this will be set to true.
-    # This will trigger goldenpod to write the list.
-    downloadedDirty => 0,
-};
+# Internal application state. The state itself is lazy-loaded when it is needed, so
+# you almost certainly want either getMetaState() or getDownloadedState()
+# instead of looking at this directly.
+my $state = {};
 
 # Our config
 my %Config;
@@ -523,9 +508,10 @@ sub hasAlreadyBeenDownloaded
 {
     my $feed = shift // '';
     my $file = shift;
-    if(defined $state->{downloaded}->{$feed})
+    my $downloadedState = getDownloadedState();
+    if(defined $downloadedState->{$feed})
     {
-        if(defined $state->{downloaded}->{$feed}->{$file})
+        if(defined $downloadedState->{$feed}->{$file})
         {
             return 1;
         }
@@ -833,7 +819,8 @@ sub outputSourceOfFile
     # We're interested in the last two components of the file
     my $path = join('/',$components[-2],$components[-1]);
 
-    my $stateEntry = $state->{meta}->{files}->{$path};
+    my $metaState = getMetaState();
+    my $stateEntry = $metaState->{files}->{$path};
 
     if ($stateEntry && ref($stateEntry) && $stateEntry->{from})
     {
@@ -1685,10 +1672,12 @@ sub goldenpodGpodderNetAction
         return;
     }
 
+    my $metaState = getMetaState();
+
     my $gpodder = gpodderNetSync->new(
         $Config{gpodderNetUser},
         $Config{gpodderNetPassword},
-        $state->{meta}->{gpodder}->{delta}
+        $metaState->{gpodder}->{delta}
     );
 
     my $action = shift;
@@ -1703,7 +1692,7 @@ sub goldenpodGpodderNetAction
         my $res = $gpodder->uploadChangedSubscriptions( $change );
         # FIXME: It returns a list of URLs that it wants us to update. We need
         # to handle these.
-        $state->{meta}->{gpodder}->{delta} = $res->{timestamp};
+        $metaState->{gpodder}->{delta} = $res->{timestamp};
         $state->{metaDirty} = 1;
     }
     elsif ($action eq 'push')
@@ -1748,7 +1737,7 @@ sub goldenpodGpodderNetAction
                 }
             }
         }
-        $state->{meta}->{gpodder}->{delta} = $changes->{timestamp};
+        $metaState->{gpodder}->{delta} = $changes->{timestamp};
         $state->{metaDirty} = 1;
     }
 
@@ -1996,36 +1985,67 @@ package gpodderNetSync
 # State functions (read/modify/write)
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-# Purpose: Load our state into $state
-# Usge: loadState()
-sub loadState
+# Purpose: Retrieve the metadata state
+# Usage: getMetaState();
+sub getMetaState
 {
-    state $loadedState = 0;
-    return if $loadedState;
-    my $PodcastLog = $UserConfigDir.'/podcasts.log';
-    if (-e $UserConfigDir.'/downloaded.json')
+    state $loaded = 0;
+    if (!$loaded)
     {
-        sayd('Loading state from downloaded.json');
-        $state->{downloaded} = decode_json( slurpFile($UserConfigDir.'/downloaded.json') );
-    }
-    elsif (-e $PodcastLog)
-	{
-        sayd('Migrating old podcasts.log state to downloaded.json');
-        my $oldData = slurpFile($PodcastLog);
-        $state->{downloaded}->{'__GLOBAL__'} //= {};
-        foreach my $entry(split(/\n/,$oldData))
+        if (-e $UserConfigDir.'/meta.json')
         {
-            $state->{downloaded}->{'__GLOBAL__'}->{$entry} = {};
+            sayd('Loading state from meta.json');
+            $state->{meta} = decode_json( slurpFile($UserConfigDir.'/meta.json') );
         }
-        $state->{downloadedDirty} = 1;
-	}
-    if (-e $UserConfigDir.'/meta.json')
-    {
-        sayd('Loading state from meta.json');
-        $state->{meta} = decode_json( slurpFile($UserConfigDir.'/meta.json') );
+        else
+        {
+            $state->{meta} = {
+                _VERSION => 1,
+                files => {},
+                # gpodder.net metadata
+                gpodder => {
+                    delta => 0
+                }
+            };
+        }
+        $loaded = 1;
     }
-    sayd('All state has been loaded.');
-    $loadedState = 1;
+    return $state->{meta};
+}
+
+# Purpose: Retrieve the downloaded state
+# Usage: getDownloadedState();
+sub getDownloadedState
+{
+    state $loaded = 0;
+    if (!$loaded)
+    {
+        my $PodcastLog = $UserConfigDir.'/podcasts.log';
+        if (-e $UserConfigDir.'/downloaded.json')
+        {
+            sayd('Loading state from downloaded.json');
+            $state->{downloaded} = decode_json( slurpFile($UserConfigDir.'/downloaded.json') );
+        }
+        elsif (-e $PodcastLog)
+        {
+            sayd('Migrating old podcasts.log state to downloaded.json');
+            my $oldData = slurpFile($PodcastLog);
+            $state->{downloaded}->{'__GLOBAL__'} //= {};
+            foreach my $entry(split(/\n/,$oldData))
+            {
+                $state->{downloaded}->{'__GLOBAL__'}->{$entry} = {};
+            }
+            $state->{downloadedDirty} = 1;
+        }
+        else
+        {
+            $state->{downloaded} = {
+                _VERSION => 1,
+            };
+        }
+        $loaded = 1;
+    }
+    return $state->{downloaded};
 }
 
 # Purpose: Write any dirty state to disk
@@ -2060,15 +2080,16 @@ sub addMetadataTitle
     {
         return;
     }
-    $state->{meta}->{titles}->{$feed} //= {
+    my $metaState = getMetaState();
+    $metaState->{titles}->{$feed} //= {
         current => undef,
     };
-    $state->{meta}->{titles}->{$feed}->{historical} //= [];
-    my $oldCurrent = $state->{meta}->{titles}->{$feed}->{current};
-    $state->{meta}->{titles}->{$feed}->{current} = $title;
+    $metaState->{titles}->{$feed}->{historical} //= [];
+    my $oldCurrent = $metaState->{titles}->{$feed}->{current};
+    $metaState->{titles}->{$feed}->{current} = $title;
     if(defined $oldCurrent && $oldCurrent ne $title)
     {
-        push(@{ $state->{meta}->{titles}->{$feed}->{historical} },$oldCurrent);
+        push(@{ $metaState->{titles}->{$feed}->{historical} },$oldCurrent);
     }
     $state->{metaDirty} = 1;
 }
@@ -2080,14 +2101,16 @@ sub appendToDownloadedList
     my $file = shift;
     my $outputFile = shift;
     my $when = shift // time;
-    $state->{downloaded}->{$feed} //= {};
-    $state->{downloaded}->{$feed}->{$file} //= {
+    my $downloadedState = getDownloadedState();
+    $downloadedState->{$feed} //= {};
+    $downloadedState->{$feed}->{$file} //= {
         when => $when
     };
     $state->{downloadedDirty} = 1;
     if(defined $outputFile)
     {
-        $state->{meta}->{files}->{$outputFile} = {
+        my $metaState = getMetaState();
+        $metaState->{files}->{$outputFile} = {
             from => $feed,
         };
         $state->{metaDirty} = 1;
@@ -2108,12 +2131,13 @@ sub getPodcastNameFromMeta
     }
     my @components = split('/',$origPath);
     my $resolvedName = $components[-2].'/'.$components[-1];
-    if (my $resolved = $state->{meta}->{files}->{$resolvedName})
+    my $metaState = getMetaState();
+    if (my $resolved = $metaState->{files}->{$resolvedName})
     {
         my $feed = $resolved->{from};
-        if ($feed && defined $state->{meta}->{titles}->{$feed})
+        if ($feed && defined $metaState->{titles}->{$feed})
         {
-            return $state->{meta}->{titles}->{$feed}->{current};
+            return $metaState->{titles}->{$feed}->{current};
         }
     }
     return;
@@ -2828,8 +2852,6 @@ sub initialize
     {
         PrepareLogging();
     }
-    # Load our alredy downloaded files
-	loadState();
 }
 
 # Purpose: The main function
