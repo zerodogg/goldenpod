@@ -2959,7 +2959,7 @@ sub main
 
 	if(not -e $PodcastList)
 	{
-		die "The configuration file \"$PodcastList\" does not exist!\nPlease read the manpage included to get instructions on how to set one up.\n";
+        die "You have no podcasts. You should --add some (see the manpage for more information)\n";
 	}
 
 	# Fetch and parse our feeds.
