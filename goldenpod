@@ -1480,6 +1480,8 @@ sub listFeeds
 		die("You have no feeds added to GoldenPod\n");
 	}
 
+    my $longestURL = 0;
+
 	foreach my $feed (@{$feeds})
 	{
         my $metaEntry = $metaState->{titles}->{$feed->{podcast}};
@@ -1490,6 +1492,10 @@ sub listFeeds
         else
         {
             $feed->{name} = 'unknown title';
+        }
+        if(length($feed->{podcast}) > $longestURL)
+        {
+            $longestURL = length($feed->{podcast});
         }
 		if ($feed->{match})
 		{
@@ -1506,14 +1512,14 @@ sub listFeeds
 		print "You have the following standard podcast feeds:\n";
 		foreach my $feed (@normalFeeds)
 		{
-            printf("%-30s (%s)\n",$feed->{podcast},$feed->{name});
+            printf("%-${longestURL}s (%s)\n",$feed->{podcast},$feed->{name});
 		}
 	}
 	if (@fuzzyFeeds)
 	{
 		print "\n" if (@normalFeeds);
 		print "You have the following podcasts using the fuzzy parser:\n";
-		my $format = '%-20s %-30s (%s)'."\n";
+		my $format = "%-20s %-${longestURL}s (%s)\n";
 		printf($format,'Regex:','URL:','name');
 		foreach my $feed (@fuzzyFeeds)
 		{
