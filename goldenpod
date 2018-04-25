@@ -1474,6 +1474,7 @@ sub listFeeds
 	my @normalFeeds;
 	my @fuzzyFeeds;
 	my $feeds = ParseList();
+    my $metaState = getMetaState();
 	if(not @{$feeds})
 	{
 		die("You have no feeds added to GoldenPod\n");
@@ -1481,6 +1482,15 @@ sub listFeeds
 
 	foreach my $feed (@{$feeds})
 	{
+        my $metaEntry = $metaState->{titles}->{$feed->{podcast}};
+        if ($metaEntry)
+        {
+            $feed->{name} = $metaEntry->{currentFull};
+        }
+        else
+        {
+            $feed->{name} = 'unknown title';
+        }
 		if ($feed->{match})
 		{
 			push(@fuzzyFeeds,$feed);
@@ -1496,15 +1506,15 @@ sub listFeeds
 		print "You have the following standard podcast feeds:\n";
 		foreach my $feed (@normalFeeds)
 		{
-			print $feed->{podcast}."\n";
+            printf("%-30s (%s)\n",$feed->{podcast},$feed->{name});
 		}
 	}
 	if (@fuzzyFeeds)
 	{
 		print "\n" if (@normalFeeds);
 		print "You have the following podcasts using the fuzzy parser:\n";
-		my $format = '%-20s %s'."\n";
-		printf($format,'Regex:','URL:');
+		my $format = '%-20s %-30s (%s)'."\n";
+		printf($format,'Regex:','URL:','name');
 		foreach my $feed (@fuzzyFeeds)
 		{
 			printf($format,'/'.$feed->{match}.'/',$feed->{podcast});
