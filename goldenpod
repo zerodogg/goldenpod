@@ -39,6 +39,8 @@ use POSIX qw(uname);
 use IPC::Open2;
 # Used to store our downloaded state
 use JSON::PP;
+# Used to get backtraces when we die() of bugs
+use Carp qw(confess);
 # Using true/false is easier to read than 0/1
 use constant { true => 1, false => 0 };
 # Allow bundling of options with GeteOpt
@@ -2774,7 +2776,13 @@ sub initialize
     {
         if ($initialized ne $mode)
         {
-            die('attempted to re-initialize with a new mode');
+            # If initialize() is called with util, but we have already
+            # initialized full, that is fine, but the other way around
+            # is not.
+            if ($initialized ne 'full')
+            {
+                confess('attempted to re-initialize with a upgraded mode');
+            }
         }
         return;
     }
