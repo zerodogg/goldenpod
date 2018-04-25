@@ -586,14 +586,14 @@ sub printv
 	}
 }
 
-# Purpose: print() something if debug output is enabled
-# Usage: printd(OPTS);
-#  OPTS are identical to print();
-sub printd
+# Purpose: say() something if debug output is enabled
+# Usage: sayd(OPTS);
+#  OPTS are identical to say();
+sub sayd
 {
     if ($Verbose >= 99)
     {
-        print('Debug: ',@_);
+        say('Debug: ',@_);
     }
 }
 
@@ -1300,7 +1300,7 @@ sub InitGlobalConfig
     # Upgrades the config to include the gpodder.net options, if needed
     if (!defined $Config{gpodderNetUser})
     {
-        printd('Upgraded config for gpodder.net options'."\n");
+        sayd('Upgraded config for gpodder.net options');
         $Config{gpodderNetUser} = '';
         $Config{gpodderNetPassword} = '';
         WriteGPConfig();
@@ -1697,7 +1697,7 @@ sub goldenpodGpodderNetAction
         my $change = {
             $action => [ $feed ]
         };
-        printd('gpodder.net: '.$action.' '.$feed."\n");
+        sayd('gpodder.net: '.$action.' '.$feed);
         my $res = $gpodder->uploadChangedSubscriptions( $change );
         # FIXME: It returns a list of URLs that it wants us to update. We need
         # to handle these.
@@ -1715,14 +1715,14 @@ sub goldenpodGpodderNetAction
                 push(@allNormal,$feed->{podcast});
             }
         }
-        printd('gpodder.net: pushing all subscriptions'."\n");
+        sayd('gpodder.net: pushing all subscriptions');
         $gpodder->uploadSubscriptions(
             @allNormal
         );
     }
     elsif ($action eq 'sync')
     {
-        printd('gpodder.net: downloading subscriptions'."\n");
+        sayd('gpodder.net: downloading subscriptions');
         my $changes = $gpodder->getChangedSubscriptions();
         if(defined $changes->{add})
         {
@@ -2003,12 +2003,12 @@ sub loadState
     my $PodcastLog = $UserConfigDir.'/podcasts.log';
     if (-e $UserConfigDir.'/downloaded.json')
     {
-        printd('Loading state from downloaded.json'."\n");
+        sayd('Loading state from downloaded.json');
         $state->{downloaded} = decode_json( slurpFile($UserConfigDir.'/downloaded.json') );
     }
     elsif (-e $PodcastLog)
 	{
-        printd('Migrating old podcasts.log state to downloaded.json'."\n");
+        sayd('Migrating old podcasts.log state to downloaded.json');
         my $oldData = slurpFile($PodcastLog);
         $state->{downloaded}->{'__GLOBAL__'} //= {};
         foreach my $entry(split(/\n/,$oldData))
@@ -2019,10 +2019,10 @@ sub loadState
 	}
     if (-e $UserConfigDir.'/meta.json')
     {
-        printd('Loading state from meta.json'."\n");
+        sayd('Loading state from meta.json');
         $state->{meta} = decode_json( slurpFile($UserConfigDir.'/meta.json') );
     }
-    printd('All state has been loaded.'."\n");
+    sayd('All state has been loaded.');
     $loadedState = 1;
 }
 
@@ -2031,7 +2031,7 @@ sub writeDirtyState
 {
     if ($state->{downloadedDirty})
     {
-        printd('Writing dirty downloaded.json state'."\n");
+        sayd('Writing dirty downloaded.json state');
         my $json = JSON::PP->new;
         $json->pretty;
         $state->{downloaded}->{'_VERSION'} = 1;
@@ -2040,7 +2040,7 @@ sub writeDirtyState
     }
     if ($state->{metaDirty})
     {
-        printd('Writing dirty meta.json state'."\n");
+        sayd('Writing dirty meta.json state');
         my $json = JSON::PP->new;
         $json->pretty;
         $state->{meta}->{'_VERSION'} = 1;
