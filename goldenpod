@@ -1474,7 +1474,6 @@ sub listFeeds
 	my @normalFeeds;
 	my @fuzzyFeeds;
 	my $feeds = ParseList();
-    my $metaState = getMetaState();
 	if(not @{$feeds})
 	{
 		die("You have no feeds added to GoldenPod\n");
@@ -1484,15 +1483,7 @@ sub listFeeds
 
 	foreach my $feed (@{$feeds})
 	{
-        my $metaEntry = $metaState->{titles}->{$feed->{podcast}};
-        if ($metaEntry && $metaEntry->{currentFull})
-        {
-            $feed->{name} = $metaEntry->{currentFull};
-        }
-        else
-        {
-            $feed->{name} = 'unknown title';
-        }
+        $feed->{name} = getFeedNameFromMeta( $feed->{podcast} );
         if(length($feed->{podcast}) > $longestURL)
         {
             $longestURL = length($feed->{podcast});
@@ -2191,6 +2182,22 @@ sub getPodcastNameFromMeta
         }
     }
     return;
+}
+
+# Purpose: Get the name of a feed from the metadata store
+# Usage: name = getFeedNameFromMeta( URL );
+# Returns "unknown title" if it is not known.
+# Note: returns the user-readable "name", not the one used for the directory
+sub getFeedNameFromMeta
+{
+    my $url = shift;
+    my $metaState = getMetaState();
+    my $metaEntry = $metaState->{titles}->{$url};
+    if ($metaEntry && $metaEntry->{currentFull})
+    {
+        return $metaEntry->{currentFull};
+    }
+    return 'unknown title';
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
