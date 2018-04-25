@@ -840,7 +840,13 @@ sub outputSourceOfFile
 
     if ($stateEntry && ref($stateEntry) && $stateEntry->{from})
     {
-        say $path.': is from '.$stateEntry->{from};
+        my $name = getFeedNameFromMeta( $stateEntry->{from} );
+        say $path.':';
+        say 'From the feed at '.$stateEntry->{from}.' ('.$name.')';
+        if ($stateEntry->{sourceURL})
+        {
+            say 'Downloaded from '.$stateEntry->{sourceURL};
+        }
     }
     else
     {
