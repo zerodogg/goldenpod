@@ -2152,7 +2152,8 @@ sub appendToDownloadedList
     my $downloadedState = getDownloadedState();
     $downloadedState->{$feed} //= {};
     $downloadedState->{$feed}->{$file} //= {
-        when => $when
+        when => $when,
+        writtenTo => $outputFile,
     };
     $state->{downloadedDirty} = 1;
     if(defined $outputFile)
@@ -2160,6 +2161,7 @@ sub appendToDownloadedList
         my $metaState = getMetaState();
         $metaState->{files}->{$outputFile} = {
             from => $feed,
+            sourceURL => $file,
         };
         $state->{metaDirty} = 1;
     }
