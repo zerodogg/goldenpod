@@ -2068,7 +2068,7 @@ sub getDownloadedState
 sub writeDirtyState
 {
     sayd('Writing dirty state if needed.');
-    if ($state->{downloadedDirty})
+    if ($state->{downloadedDirty} || $ENV{_GOLDENPOD_FORCE_STATE_WRITE})
     {
         sayd('Writing dirty downloaded.json state');
         my $json = JSON::PP->new;
@@ -2077,7 +2077,7 @@ sub writeDirtyState
         writeFile($UserConfigDir.'/downloaded.json',$json->encode($state->{downloaded}));
         $state->{downloadedDirty} = 0;
     }
-    if ($state->{metaDirty})
+    if ($state->{metaDirty} || $ENV{_GOLDENPOD_FORCE_STATE_WRITE})
     {
         sayd('Writing dirty meta.json state');
         my $json = JSON::PP->new;
