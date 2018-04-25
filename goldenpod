@@ -2003,10 +2003,12 @@ sub loadState
     my $PodcastLog = $UserConfigDir.'/podcasts.log';
     if (-e $UserConfigDir.'/downloaded.json')
     {
+        printd('Loading state from downloaded.json'."\n");
         $state->{downloaded} = decode_json( slurpFile($UserConfigDir.'/downloaded.json') );
     }
     elsif (-e $PodcastLog)
 	{
+        printd('Migrating old podcasts.log state to downloaded.json'."\n");
         my $oldData = slurpFile($PodcastLog);
         $state->{downloaded}->{'__GLOBAL__'} //= {};
         foreach my $entry(split(/\n/,$oldData))
@@ -2017,8 +2019,10 @@ sub loadState
 	}
     if (-e $UserConfigDir.'/meta.json')
     {
+        printd('Loading state from meta.json'."\n");
         $state->{meta} = decode_json( slurpFile($UserConfigDir.'/meta.json') );
     }
+    printd('All state has been loaded.'."\n");
     $loadedState = 1;
 }
 
@@ -2027,6 +2031,7 @@ sub writeDirtyState
 {
     if ($state->{downloadedDirty})
     {
+        printd('Writing dirty downloaded.json state'."\n");
         my $json = JSON::PP->new;
         $json->pretty;
         $state->{downloaded}->{'_VERSION'} = 1;
@@ -2035,6 +2040,7 @@ sub writeDirtyState
     }
     if ($state->{metaDirty})
     {
+        printd('Writing dirty meta.json state'."\n");
         my $json = JSON::PP->new;
         $json->pretty;
         $state->{meta}->{'_VERSION'} = 1;
