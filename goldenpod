@@ -483,6 +483,18 @@ sub DownloadURL
 # Helper functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+# Purpose: Exit the software, cleaning up if needed
+# Usage: exitProgram( RETURN VALUE );
+sub exitProgram
+{
+    my $return = shift // 0;
+
+    # Ensure any dirty state gets written out
+    writeDirtyState();
+
+    exit $return;
+}
+
 # Purpose: Read in a file, returning its contents or erroring out
 # Usage: $content = slurpFile($file);
 sub slurpFile
@@ -1090,9 +1102,9 @@ sub DeleteOldPodcasts
 		last if not $FileList[0];
 	}
 	# Stop here if we're in dry run mode
-	exit if $DryRun_Mode;
+	exitProgram() if $DryRun_Mode;
 	CleanupDirs();
-	exit
+	exitProgram()
 }
 
 # Purpose: Copy files to $CopyFilesTo
@@ -1200,7 +1212,7 @@ sub CopyFiles
 		system('sync');
 	}
 	printv("All done\n");
-	exit
+	exitProgram()
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1498,7 +1510,7 @@ sub listFeeds
 			printf($format,'/'.$feed->{match}.'/',$feed->{podcast});
 		}
 	}
-	exit(0);
+	exitProgram(0);
 }
 
 # Purpose: Handle --addfeed to add a feed
@@ -1542,7 +1554,7 @@ sub addFeed
     {
         print "Skipped adding the feed $feed: already existed\n";
     }
-	exit(0);
+	exitProgram(0);
 }
 
 # Purpose: Add a single feed to the feed list
@@ -1616,9 +1628,9 @@ sub removeFeed
 	else
 	{
 		print "The feed \"$feed\" was not found.\n";
-		exit(1);
+		exitProgram(1);
 	}
-	exit(0);
+	exitProgram(0);
 }
 
 # Purpose: Remove a single feed from the feed list
@@ -2055,6 +2067,7 @@ sub getDownloadedState
 # Purpose: Write any dirty state to disk
 sub writeDirtyState
 {
+    sayd('Writing dirty state if needed.');
     if ($state->{downloadedDirty})
     {
         sayd('Writing dirty downloaded.json state');
@@ -2221,7 +2234,7 @@ sub pingFeed
 	shift; my $url = shift;
 	my $secondTry = shift;
 	my $Output = fetchURL($url);
-	exit if not $Output;
+	exitProgram() if not $Output;
 	my ($URLs, $Title) = ParseFeed($Output,'.',$url);
 	my ($fURLs, $fTitle) = FuzzyParseFeed($Output,'.',$url);
 	my $normalResults = scalar @{$URLs};
@@ -2240,7 +2253,7 @@ sub pingFeed
 				print "You may want to manually --ping any of the other feeds\n";
 				print "listed above.\n";
 			}
-			exit(0);
+			exitProgram(0);
 		}
 		if ($feedList and @{$feedList})
 		{
@@ -2254,7 +2267,7 @@ sub pingFeed
 		{
 			print "Found nothing using either parser\n";
 		}
-		exit(0);
+		exitProgram(0);
 	}
 	print 'Found '.$normalResults.' files using the standard/RSS parser'."\n";
 	print 'Found '.$fuzzyResults.' files using the fuzzy parser'."\n";
@@ -2311,7 +2324,7 @@ sub pingFeed
 			print $f."\n";
 		}
 	}
-	exit(0);
+	exitProgram(0);
 }
 
 # Purpose: Parse a HTML page, looking for <link rel="alternate"> entries
@@ -2631,7 +2644,7 @@ sub quickDownload
 	my $Output = fetchURL($URL);
 
 	# Skip if we didn't recieve anything
-	exit if not $Output;
+	exitProgram() if not $Output;
 
 	my $download;
 
@@ -2654,14 +2667,14 @@ sub quickDownload
 	{
 		print "\nGoldenPod has already downloaded the first podcast in this feed.\n";
 		print "Nothing to do.\n";
-		exit(0);
+		exitProgram(0);
 	}
 	my $files = DownloadPodcasts([ $download ], true);
 	if(scalar(@{$files}))
 	{
 		CreateCatalogue($files);
 	}
-	exit(0);
+	exitProgram(0);
 }
 
 # Purpose: Fetch and parse the feeds
@@ -2927,7 +2940,7 @@ sub main
     # If we're in NoDownloadMode, then we should exit here
     if ($NoDownloadMode)
     {
-        exit(0);
+        exitProgram(0);
     }
 	if(scalar(@{$DownloadQueue}) == 0)
 	{
@@ -2935,7 +2948,7 @@ sub main
 		{
 			print "Nothing to download\n";
 		}
-		exit(0);
+		exitProgram(0);
 	}
 	# Then download the podcasts
 	my $Downloaded = DownloadPodcasts($DownloadQueue);
@@ -2952,9 +2965,9 @@ sub main
 # Parse commandline arguments
 GetOptions (
 	'verbose|v' => sub {  Arg_Verbose() },
-	'version' => sub { Version(); exit 0},
-	'help|h' => sub { Help(); exit 0; },
-	'help-all' => sub { Help(1); exit 0; },
+	'version' => sub { Version(); exitProgram(0)},
+	'help|h' => sub { Help(); exitProgram(0); },
+	'help-all' => sub { Help(1); exitProgram(0); },
 	'no-download|nodownload|w' => sub {
         say "WARNING: --no-download (-w) is deprecated and will be removed in a future version.";
         say "         Look into --mark-as-downloaded instead.";
@@ -2977,7 +2990,7 @@ GetOptions (
         {
             say "Marked all items in $feed as downloaded.";
         }
-        exit(0);
+        exitProgram(0);
     },
 	'first-only|firstonly|first|f' => \$FirstOnly,
 	'nolog|l' => sub { $NoLog = 2},
@@ -2985,7 +2998,7 @@ GetOptions (
 	'clean' => sub {
         initialize('util'),
 		CleanupDirs();
-		exit(0);
+		exitProgram(0);
 	},
 	't|list|listfeeds' => \&listFeeds,
 	'a|add|addfeed=s' => \&addFeed,
@@ -2997,7 +3010,7 @@ GetOptions (
     {
         initialize('util'),
         goldenpodGpodderNetAction('push');
-        exit(0);
+        exitProgram(0);
     },
     'gpodder-sync' => sub
     {
@@ -3008,41 +3021,41 @@ GetOptions (
     {
         initialize('util'),
         goldenpodGpodderNetAction('sync');
-        exit(0);
+        exitProgram(0);
     },
 	'fuzzydump=s' => sub {
 		shift; my $url = shift;
 		my $Output = fetchURL($url);
-		exit if not $Output;
+		exitProgram() if not $Output;
 		my ($URLs, $Title) = FuzzyParseFeed($Output,'.',$url);
 		if (not @{$URLs})
 		{
 			print "Found no audio files\n";
-			exit(0);
+			exitProgram(0);
 		}
 		print "Page is '$Title', found the following audio files:\n";
 		foreach my $f (@{$URLs})
 		{
 			print $f."\n";
 		}
-		exit(0);
+		exitProgram(0);
 	},
 	'rssdump=s' => sub {
 		shift; my $url = shift;
 		my $Output = fetchURL($url);
-		exit if not $Output;
+		exitProgram() if not $Output;
 		my ($URLs, $Title) = ParseFeed($Output,'.',$url);
 		if (not @{$URLs})
 		{
 			print "Found no files\n";
-			exit(0);
+			exitProgram(0);
 		}
 		print "Page is '$Title', found the following files:\n";
 		foreach my $f (@{$URLs})
 		{
 			print $f."\n";
 		}
-		exit(0);
+		exitProgram(0);
 	},
 	'ping=s' => \&pingFeed,
 	'silent|s' => sub
@@ -3076,13 +3089,13 @@ GetOptions (
 		}
 		$USED_DISKSPACE = $USED_DISKSPACE/1024/1024;
 		print 'The files are using ', sprintf ('%.0f', $USED_DISKSPACE), " MB of diskspace\n";
-		exit 0
+		exitProgram(0)
 	},
     'file-source=s' => sub
     {
         shift;
         outputSourceOfFile(shift);
-        exit(0);
+        exitProgram(0);
     },
 	'quick=s' => \&quickDownload,
     # Increase verbosity to enable debugging messages
@@ -3090,7 +3103,7 @@ GetOptions (
         Arg_Verbose(99);
     },
 	# Display information about which config files and settings we would use
-	'dumpinfo|debuginfo' => sub { DumpInfo(1); exit 0 },
+	'dumpinfo|debuginfo' => sub { DumpInfo(1); exitProgram(0) },
 	'prefer-curl|prefercurl' => sub { $downloader = 'curl' },
 ) or die 'Run ', basename($0), " --help for help\n";
 
